@@ -7,24 +7,44 @@ import {
   AlertCircle, 
   ChevronRight,
   Activity,
-  UserCheck
+  UserCheck,
+  Database
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
-    totalUsers: 156,
-    activeTeams: 4,
-    pendingTasks: 12,
-    monthlyAttendance: 450,
+    totalUsers: 0,
+    activeTeams: 0,
+    pendingTasks: 0,
+    monthlyAttendance: 0,
   });
+  const [supabaseStatus, setSupabaseStatus] = useState<{configured: boolean, url: string | null}>({ configured: false, url: null });
+
+  useEffect(() => {
+    fetch('/api/supabase/status')
+      .then(res => res.json())
+      .then(data => setSupabaseStatus(data));
+    
+    // Fetch real stats
+    fetch('/api/users').then(res => res.json()).then(data => setStats(prev => ({ ...prev, totalUsers: data.length })));
+    fetch('/api/teams').then(res => res.json()).then(data => setStats(prev => ({ ...prev, activeTeams: data.length })));
+  }, []);
 
   return (
     <div className="space-y-8">
-      <header>
-        <h2 className="text-2xl font-bold text-stone-900">Painel Administrativo</h2>
-        <p className="text-stone-500">Gerencie sua comunidade e acompanhe o engajamento.</p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-stone-900">Painel Administrativo</h2>
+          <p className="text-stone-500">Gerencie sua comunidade e acompanhe o engajamento.</p>
+        </div>
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+          supabaseStatus.configured ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-stone-100 text-stone-500 border border-stone-200'
+        }`}>
+          <Database size={12} />
+          {supabaseStatus.configured ? 'Supabase Conectado' : 'Supabase Offline'}
+        </div>
       </header>
 
       {/* Stats Grid */}
