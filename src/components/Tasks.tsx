@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Clock, Star, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { CheckSquare, Clock, Star, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Task, User } from '../types';
 
@@ -8,6 +8,7 @@ export default function Tasks({ user }: { user: User }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [completing, setCompleting] = useState<number | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   useEffect(() => {
     fetch('/api/tasks')
@@ -81,7 +82,8 @@ export default function Tasks({ user }: { user: User }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               key={task.id}
-              className="bg-white p-5 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row md:items-center gap-4 group hover:border-red-200 transition-all"
+              onClick={() => setSelectedTask(task)}
+              className="bg-white p-5 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row md:items-center gap-4 group hover:border-red-200 transition-all cursor-pointer"
             >
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
                 task.category === 'Desafio' ? 'bg-orange-50 text-orange-600' :
@@ -122,7 +124,10 @@ export default function Tasks({ user }: { user: User }) {
                 </div>
 
                 <button
-                  onClick={() => handleComplete(task.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleComplete(task.id);
+                  }}
                   disabled={completing === task.id || isExpired(task.deadline)}
                   className={`px-6 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${
                     completing === task.id
@@ -146,6 +151,106 @@ export default function Tasks({ user }: { user: User }) {
               </div>
             </motion.div>
           ))}
+        </AnimatePresence>
+
+        {/* Task Detail Modal */}
+        <AnimatePresence>
+          {selectedTask && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSelectedTask(null)}
+                className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden"
+              >
+                <div className="p-6 border-b border-stone-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      selectedTask.category === 'Desafio' ? 'bg-orange-50 text-orange-600' :
+                      selectedTask.category === 'Culto' ? 'bg-blue-50 text-blue-600' :
+                      selectedTask.category === 'Célula' ? 'bg-purple-50 text-purple-600' :
+                      'bg-red-50 text-red-600'
+                    }`}>
+                      <CheckSquare size={20} />
+                    </div>
+                    <h3 className="text-xl font-bold text-stone-900">Detalhes da Missão</h3>
+                  </div>
+                  <button onClick={() => setSelectedTask(null)} className="p-2 text-stone-400 hover:text-stone-900 transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="p-8 space-y-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider px-2 py-1 bg-stone-100 text-stone-500 rounded-full">
+                        {selectedTask.category}
+                      </span>
+                      <span className="text-xs font-bold uppercase tracking-wider px-2 py-1 bg-red-50 text-red-600 rounded-full">
+                        {selectedTask.type}
+                      </span>
+                    </div>
+                    <h4 className="text-2xl font-black text-stone-900 leading-tight mb-4">{selectedTask.title}</h4>
+                    <div className="prose prose-stone max-w-none">
+                      <p className="text-stone-600 leading-relaxed whitespace-pre-wrap">{selectedTask.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-stone-100">
+                    <div className="bg-stone-50 p-4 rounded-2xl">
+                      <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Recompensa</p>
+                      <div className="flex items-center gap-1 text-red-600 font-bold text-lg">
+                        <Star size={18} fill="currentColor" />
+                        <span>{selectedTask.points} Pontos</span>
+                      </div>
+                    </div>
+                    {selectedTask.deadline && (
+                      <div className="bg-stone-50 p-4 rounded-2xl">
+                        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Prazo Final</p>
+                        <div className={`flex items-center gap-1 font-bold text-sm ${isExpired(selectedTask.deadline) ? 'text-red-500' : 'text-stone-600'}`}>
+                          <Clock size={16} />
+                          <span>{new Date(selectedTask.deadline).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      handleComplete(selectedTask.id);
+                      setSelectedTask(null);
+                    }}
+                    disabled={completing === selectedTask.id || isExpired(selectedTask.deadline)}
+                    className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-lg shadow-xl ${
+                      completing === selectedTask.id
+                        ? 'bg-red-500 text-white'
+                        : isExpired(selectedTask.deadline)
+                          ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                          : 'bg-stone-900 text-white hover:bg-stone-800 shadow-stone-200'
+                    }`}
+                  >
+                    {completing === selectedTask.id ? (
+                      <>
+                        <CheckCircle2 size={24} />
+                        Enviado com Sucesso
+                      </>
+                    ) : isExpired(selectedTask.deadline) ? (
+                      'Missão Expirada'
+                    ) : (
+                      'Aceitar e Concluir Missão'
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
         </AnimatePresence>
 
         {filteredTasks.length === 0 && (

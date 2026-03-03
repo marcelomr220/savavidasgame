@@ -3,6 +3,10 @@ import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -158,6 +162,26 @@ async function startServer() {
 
   // --- API Routes ---
 
+  // Supabase Health Check
+  app.get("/api/supabase-health", async (req, res) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return res.status(400).json({ error: "Supabase credentials missing in environment" });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    try {
+      const { data, error } = await supabase.from('users').select('count', { count: 'exact', head: true });
+      if (error) throw error;
+      res.json({ status: "connected", userCount: data });
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err.message });
+    }
+  });
+
   // Auth (Simplified)
   app.post("/api/login", (req, res) => {
     const { email, password } = req.body;
@@ -205,6 +229,39 @@ async function startServer() {
     }
   });
 
+  app.post("/api/admin/users/bulk", (req, res) => {
+    const { users } = req.body;
+    if (!Array.isArray(users)) {
+      return res.status(400).json({ error: "Invalid users format" });
+    }
+
+    try {
+      const insert = db.prepare(`
+        INSERT INTO users (name, email, password, role, team_id, points, level) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const insertMany = db.transaction((users) => {
+        for (const user of users) {
+          insert.run(
+            user.name,
+            user.email,
+            user.password || "user123",
+            user.role || "user",
+            user.team_id || null,
+            user.points || 0,
+            user.level || 1
+          );
+        }
+      });
+
+      insertMany(users);
+      res.json({ success: true, count: users.length });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.put("/api/admin/users/:id", (req, res) => {
     const { name, email, password, role, team_id, points, level, streak } = req.body;
     try {
@@ -220,7 +277,9 @@ async function startServer() {
   });
 
   app.delete("/api/admin/users/:id", (req, res) => {
-    const userId = req.params.id;
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) return res.status(400).json({ error: "Invalid user ID" });
+
     try {
       const deleteUser = db.transaction(() => {
         // Remove related records
@@ -233,7 +292,8 @@ async function startServer() {
         db.prepare("UPDATE teams SET leader_id = NULL WHERE leader_id = ?").run(userId);
         
         // Finally delete the user
-        db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+        const result = db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+        if (result.changes === 0) throw new Error("User not found");
       });
       
       deleteUser();
@@ -295,17 +355,21 @@ async function startServer() {
   });
 
   app.delete("/api/admin/teams/:id", (req, res) => {
-    const teamId = req.params.id;
+    const teamId = parseInt(req.params.id);
+    if (isNaN(teamId)) return res.status(400).json({ error: "Invalid team ID" });
+
     try {
       const deleteTeam = db.transaction(() => {
         // Set team_id to NULL for all users in this team
         db.prepare("UPDATE users SET team_id = NULL WHERE team_id = ?").run(teamId);
         // Finally delete the team
-        db.prepare("DELETE FROM teams WHERE id = ?").run(teamId);
+        const result = db.prepare("DELETE FROM teams WHERE id = ?").run(teamId);
+        if (result.changes === 0) throw new Error("Team not found");
       });
       deleteTeam();
       res.json({ success: true });
     } catch (err: any) {
+      console.error("Error deleting team:", err);
       res.status(400).json({ error: err.message });
     }
   });
@@ -377,10 +441,21 @@ async function startServer() {
   });
 
   app.delete("/api/admin/tasks/:id", (req, res) => {
+    const taskId = parseInt(req.params.id);
+    if (isNaN(taskId)) return res.status(400).json({ error: "Invalid task ID" });
+
     try {
-      db.prepare("DELETE FROM tasks WHERE id = ?").run(req.params.id);
+      const deleteTask = db.transaction(() => {
+        // Remove related user_tasks first
+        db.prepare("DELETE FROM user_tasks WHERE task_id = ?").run(taskId);
+        // Finally delete the task
+        const result = db.prepare("DELETE FROM tasks WHERE id = ?").run(taskId);
+        if (result.changes === 0) throw new Error("Task not found");
+      });
+      deleteTask();
       res.json({ success: true });
     } catch (err: any) {
+      console.error("Error deleting task:", err);
       res.status(400).json({ error: err.message });
     }
   });

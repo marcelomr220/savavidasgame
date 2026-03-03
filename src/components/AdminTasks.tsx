@@ -115,8 +115,17 @@ export default function AdminTasks() {
 
   const handleDeleteTask = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
-    const res = await fetch(`/api/admin/tasks/${id}`, { method: 'DELETE' });
-    if (res.ok) fetchData();
+    try {
+      const res = await fetch(`/api/admin/tasks/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const error = await res.json();
+        alert('Erro ao excluir tarefa: ' + (error.error || 'Erro desconhecido'));
+      }
+    } catch (err) {
+      alert('Erro de conexão ao tentar excluir tarefa');
+    }
   };
 
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

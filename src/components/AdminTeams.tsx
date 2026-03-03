@@ -108,14 +108,19 @@ export default function AdminTeams() {
   const handleDelete = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir esta equipe? Os membros ficarão sem equipe.')) return;
 
-    const res = await fetch(`/api/admin/teams/${id}`, {
-      method: 'DELETE',
-    });
+    try {
+      const res = await fetch(`/api/admin/teams/${id}`, {
+        method: 'DELETE',
+      });
 
-    if (res.ok) {
-      fetchTeams();
-    } else {
-      alert('Erro ao excluir equipe');
+      if (res.ok) {
+        fetchTeams();
+      } else {
+        const error = await res.json();
+        alert('Erro ao excluir equipe: ' + (error.error || 'Erro desconhecido'));
+      }
+    } catch (err) {
+      alert('Erro de conexão ao tentar excluir equipe');
     }
   };
 

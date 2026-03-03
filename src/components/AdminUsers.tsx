@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Search, Edit2, Shield, Star, Mail, Plus, Trash2, X, Save } from 'lucide-react';
+import { User, Search, Edit2, Shield, Star, Mail, Plus, Trash2, X, Save, Upload, FileText } from 'lucide-react';
 import { User as UserType, Team } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -10,6 +10,7 @@ export default function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<UserType> | null>(null);
+  const [isBulkUploading, setIsBulkUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -102,17 +103,80 @@ export default function AdminUsers() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+    console.log('Attempting to delete user with ID:', id);
+    if (!confirm('Tem certeza que deseja excluir este usuário? Todos os dados relacionados (tarefas, presença, etc) serão removidos.')) return;
 
-    const res = await fetch(`/api/admin/users/${id}`, {
-      method: 'DELETE',
-    });
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+      });
 
-    if (res.ok) {
-      fetchUsers();
-    } else {
-      alert('Erro ao excluir usuário');
+      if (res.ok) {
+        fetchUsers();
+      } else {
+        const error = await res.json();
+        alert('Erro ao excluir usuário: ' + (error.error || 'Erro desconhecido'));
+      }
+    } catch (err) {
+      alert('Erro de conexão ao tentar excluir usuário');
     }
+  };
+
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsBulkUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      const usersToUpload = lines.slice(1).filter(line => line.trim()).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const user: any = {};
+        headers.forEach((header, index) => {
+          if (header === 'team_id') {
+            user[header] = values[index] ? parseInt(values[index]) : null;
+          } else if (header === 'points' || header === 'level') {
+            user[header] = values[index] ? parseInt(values[index]) : 0;
+          } else {
+            user[header] = values[index];
+          }
+        });
+        return user;
+      });
+
+      if (usersToUpload.length === 0) {
+        alert('Nenhum usuário encontrado no arquivo.');
+        setIsBulkUploading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/users/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ users: usersToUpload }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          alert(`${result.count} usuários cadastrados com sucesso!`);
+          fetchUsers();
+        } else {
+          const error = await res.json();
+          alert('Erro no upload: ' + error.error);
+        }
+      } catch (err) {
+        alert('Erro ao processar arquivo.');
+      } finally {
+        setIsBulkUploading(false);
+        e.target.value = ''; // Reset input
+      }
+    };
+    reader.readAsText(file);
   };
 
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>;
@@ -135,6 +199,17 @@ export default function AdminUsers() {
               className="pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all w-full md:w-64"
             />
           </div>
+          <label className="px-4 py-2 bg-white border border-stone-200 text-stone-600 rounded-xl font-bold flex items-center gap-2 hover:bg-stone-50 transition-all cursor-pointer shadow-sm">
+            <Upload size={20} />
+            {isBulkUploading ? 'Enviando...' : 'CSV'}
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleBulkUpload}
+              disabled={isBulkUploading}
+            />
+          </label>
           <button 
             onClick={() => handleOpenModal()}
             className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-200"
@@ -144,6 +219,17 @@ export default function AdminUsers() {
           </button>
         </div>
       </header>
+
+      <div className="bg-red-50 p-4 rounded-2xl border border-red-100 mb-6">
+        <div className="flex items-start gap-3">
+          <FileText className="text-red-600 shrink-0" size={20} />
+          <div className="text-sm text-red-800">
+            <p className="font-bold mb-1">Dica para Cadastro Massivo:</p>
+            <p>O arquivo CSV deve conter os seguintes cabeçalhos:</p>
+            <code className="bg-white/50 px-2 py-1 rounded mt-1 inline-block text-[10px]">name, email, password, role, team_id, points, level</code>
+          </div>
+        </div>
+      </div>
 
       <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
