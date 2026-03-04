@@ -37,7 +37,8 @@ export default function AdminTasks() {
     category: 'Culto',
     type: 'Individual',
     available_from: '',
-    deadline: ''
+    deadline: '',
+    is_active: true
   });
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function AdminTasks() {
       const data = await res.json();
       setPending(data);
     } else {
-      const res = await fetch('/api/tasks');
+      const res = await fetch('/api/admin/tasks');
       const data = await res.json();
       setTasks(data);
     }
@@ -79,7 +80,8 @@ export default function AdminTasks() {
         category: task.category || 'Culto',
         type: task.type || 'Individual',
         available_from: task.available_from ? new Date(task.available_from).toISOString().slice(0, 16) : '',
-        deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : ''
+        deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '',
+        is_active: Boolean(task.is_active)
       });
     } else {
       setEditingTask(null);
@@ -90,7 +92,8 @@ export default function AdminTasks() {
         category: 'Culto',
         type: 'Individual',
         available_from: new Date().toISOString().slice(0, 16),
-        deadline: ''
+        deadline: '',
+        is_active: true
       });
     }
     setIsModalOpen(true);
@@ -101,15 +104,22 @@ export default function AdminTasks() {
     const url = editingTask ? `/api/admin/tasks/${editingTask.id}` : '/api/admin/tasks';
     const method = editingTask ? 'PUT' : 'POST';
 
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-    if (res.ok) {
-      setIsModalOpen(false);
-      fetchData();
+      if (res.ok) {
+        setIsModalOpen(false);
+        fetchData();
+      } else {
+        const error = await res.json();
+        alert('Erro ao salvar tarefa: ' + (error.error || 'Erro desconhecido'));
+      }
+    } catch (err) {
+      alert('Erro de conexão ao tentar salvar tarefa');
     }
   };
 
@@ -498,6 +508,18 @@ export default function AdminTasks() {
                           className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
                         />
                       </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="flex items-center gap-3 cursor-pointer p-4 bg-stone-50 rounded-2xl border border-stone-200">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_active}
+                          onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                          className="w-5 h-5 rounded border-stone-300 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="text-sm font-bold text-stone-700">Tarefa Ativa (visível para usuários)</span>
+                      </label>
                     </div>
                   </div>
 

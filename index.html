@@ -4,6 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Google AI Studio App</title>
+    <script>
+      // Workaround for "Cannot set property fetch of #<Window> which has only a getter"
+      (function() {
+        try {
+          const originalFetch = window.fetch;
+          // Try to redefine the property to be writable
+          Object.defineProperty(window, 'fetch', {
+            value: originalFetch,
+            writable: true,
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {
+          console.warn('Standard fetch workaround failed, trying fallback:', e);
+          try {
+            // Fallback: delete and re-assign if possible
+            const currentFetch = window.fetch;
+            delete window.fetch;
+            window.fetch = currentFetch;
+          } catch (e2) {
+            console.error('All fetch workarounds failed:', e2);
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

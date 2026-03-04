@@ -51,22 +51,64 @@ export default function Dashboard({ user }: { user: User }) {
         <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
           <Trophy size={120} />
         </div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Nível Atual</span>
-            <h3 className="text-3xl font-bold text-stone-900">Nível {user.level}</h3>
+        
+        <div className="flex flex-col md:flex-row gap-6 items-center">
+          {/* Fire Mascot */}
+          <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
+            <motion.div
+              animate={{ 
+                scale: [1 + (progress/100) * 0.5, (1 + (progress/100) * 0.5) * 1.1, 1 + (progress/100) * 0.5],
+                rotate: [-2, 2, -2]
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="relative z-10"
+            >
+              <div className="absolute inset-0 bg-orange-500/30 rounded-full blur-xl animate-pulse" />
+              <Flame 
+                size={64} 
+                className="text-orange-500 drop-shadow-[0_0_20px_rgba(249,115,22,0.8)]" 
+                fill="currentColor"
+              />
+              {/* Inner Flame for depth */}
+              <motion.div
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+                className="absolute inset-0 flex items-center justify-center"
+              >
+                <Flame size={32} className="text-yellow-400" fill="currentColor" />
+              </motion.div>
+            </motion.div>
+            
+            {/* Base of the fire */}
+            <div className="absolute bottom-2 w-12 h-4 bg-stone-100 rounded-[100%] blur-md" />
           </div>
-          <div className="text-right">
-            <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">Próximo Nível</span>
-            <p className="text-sm font-semibold text-stone-600">{user.points}/{nextLevelPoints} XP</p>
+
+          <div className="flex-1 w-full">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Nível Atual</span>
+                <h3 className="text-3xl font-bold text-stone-900">Nível {user.level}</h3>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">Próximo Nível</span>
+                <p className="text-sm font-semibold text-stone-600">{user.points}/{nextLevelPoints} XP</p>
+              </div>
+            </div>
+            <div className="h-3 bg-stone-100 rounded-full overflow-hidden">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                className="h-full bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]"
+              />
+            </div>
+            <p className="mt-2 text-xs font-medium text-stone-400 italic">
+              Continue brilhando! Sua chama cresce a cada ponto conquistado.
+            </p>
           </div>
-        </div>
-        <div className="h-3 bg-stone-100 rounded-full overflow-hidden">
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            className="h-full bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]"
-          />
         </div>
       </section>
 

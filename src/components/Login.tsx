@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Star, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Star, Mail, Lock, ArrowRight, AlertCircle, User as UserIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../types';
 
 export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,18 +16,22 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
     setLoading(true);
     setError('');
 
+    const endpoint = isLogin ? '/api/login' : '/api/register';
+    const body = isLogin ? { email, password } : { name, email, password };
+
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
-        const user = await res.json();
-        onLogin(user);
+        onLogin(data);
       } else {
-        setError('Email ou senha incorretos. Tente admin@church.com / admin123');
+        setError(data.error || 'Erro ao processar solicitação.');
       }
     } catch (err) {
       setError('Erro ao conectar com o servidor.');
@@ -50,7 +56,42 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
         </div>
 
         <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-xl">
+          <div className="flex gap-4 mb-8 p-1 bg-stone-100 rounded-2xl">
+            <button
+              onClick={() => { setIsLogin(true); setError(''); }}
+              className={`flex-1 py-2.5 rounded-xl font-bold transition-all ${isLogin ? 'bg-white text-red-600 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+            >
+              Entrar
+            </button>
+            <button
+              onClick={() => { setIsLogin(false); setError(''); }}
+              className={`flex-1 py-2.5 rounded-xl font-bold transition-all ${!isLogin ? 'bg-white text-red-600 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+            >
+              Cadastrar
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
+            {!isLogin && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+              >
+                <label className="block text-sm font-bold text-stone-700 mb-2">Nome Completo</label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
+                    placeholder="Seu nome"
+                  />
+                </div>
+              </motion.div>
+            )}
+
             <div>
               <label className="block text-sm font-bold text-stone-700 mb-2">Email</label>
               <div className="relative">
@@ -93,9 +134,9 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
               disabled={loading}
               className="w-full py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 flex items-center justify-center gap-2 group"
             >
-              {loading ? 'Entrando...' : (
+              {loading ? (isLogin ? 'Entrando...' : 'Cadastrando...') : (
                 <>
-                  Entrar no Reino
+                  {isLogin ? 'Entrar no Reino' : 'Criar minha conta'}
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -103,7 +144,11 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
           </form>
 
           <div className="mt-8 pt-6 border-t border-stone-100 text-center">
-            <p className="text-sm text-stone-500">Ainda não tem conta? <span className="text-red-600 font-bold cursor-pointer">Fale com seu líder</span></p>
+            {isLogin ? (
+              <p className="text-sm text-stone-500">Ainda não tem conta? <span onClick={() => setIsLogin(false)} className="text-red-600 font-bold cursor-pointer">Cadastre-se agora</span></p>
+            ) : (
+              <p className="text-sm text-stone-500">Já tem uma conta? <span onClick={() => setIsLogin(true)} className="text-red-600 font-bold cursor-pointer">Faça login</span></p>
+            )}
           </div>
         </div>
       </motion.div>

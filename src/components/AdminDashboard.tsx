@@ -28,8 +28,8 @@ export default function AdminDashboard() {
       .then(data => setSupabaseStatus(data));
     
     // Fetch real stats
-    fetch('/api/users').then(res => res.json()).then(data => setStats(prev => ({ ...prev, totalUsers: data.length })));
-    fetch('/api/teams').then(res => res.json()).then(data => setStats(prev => ({ ...prev, activeTeams: data.length })));
+    fetch('/api/admin/users').then(res => res.json()).then(data => setStats(prev => ({ ...prev, totalUsers: data.length })));
+    fetch('/api/admin/teams').then(res => res.json()).then(data => setStats(prev => ({ ...prev, activeTeams: data.length })));
   }, []);
 
   return (

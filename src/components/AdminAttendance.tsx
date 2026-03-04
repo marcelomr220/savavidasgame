@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { QrCode, Plus, Calendar, Star, Users, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { QrCode, Plus, Calendar, Star, Users, CheckCircle2, Trash2, Clock } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
 export default function AdminAttendance() {
@@ -7,6 +7,20 @@ export default function AdminAttendance() {
   const [points, setPoints] = useState(10);
   const [maxCheckins, setMaxCheckins] = useState(100);
   const [currentSession, setCurrentSession] = useState<{ id: number, code: string } | null>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+
+  const fetchSessions = async () => {
+    setLoading(true);
+    const res = await fetch('/api/admin/sessions');
+    const data = await res.json();
+    setSessions(data);
+    setLoading(false);
+  };
 
   const handleCreateSession = async () => {
     const res = await fetch('/api/admin/create-session', {
@@ -16,6 +30,16 @@ export default function AdminAttendance() {
     });
     const data = await res.json();
     setCurrentSession(data);
+    fetchSessions();
+  };
+
+  const handleDeleteSession = async (id: number) => {
+    if (!confirm('Tem certeza que deseja excluir esta sessão? Todos os registros de presença vinculados serão removidos.')) return;
+    const res = await fetch(`/api/admin/sessions/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      if (currentSession?.id === id) setCurrentSession(null);
+      fetchSessions();
+    }
   };
 
   return (
@@ -112,6 +136,72 @@ export default function AdminAttendance() {
           )}
         </section>
       </div>
+
+      {/* Sessions List */}
+      <section className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-stone-100">
+          <h3 className="font-bold text-stone-900 flex items-center gap-2">
+            <Clock size={20} className="text-red-600" />
+            Sessões Recentes
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-stone-50 border-b border-stone-100">
+                <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Evento</th>
+                <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Código</th>
+                <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Pontos</th>
+                <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-50">
+              {sessions.map((session) => (
+                <tr key={session.id} className="hover:bg-stone-50/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={16} className="text-stone-400" />
+                      <span className="font-semibold text-stone-900">{session.event_type}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <code className="bg-stone-100 px-2 py-1 rounded font-bold text-stone-700">{session.code}</code>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-1 text-red-600 font-bold">
+                      <Star size={14} fill="currentColor" />
+                      <span>{session.points}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                      session.is_active ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-stone-500'
+                    }`}>
+                      {session.is_active ? 'Ativa' : 'Inativa'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => handleDeleteSession(session.id)}
+                      className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {sessions.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-stone-400 italic">
+                    Nenhuma sessão registrada.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

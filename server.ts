@@ -230,25 +230,127 @@ async function startServer() {
     }
   });
 
-  // Users
+  app.post("/api/register", async (req, res) => {
+    const { name, email, password } = req.body;
+    
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Nome, email e senha são obrigatórios" });
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      if (supabase) {
+        // Check if user exists
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .single();
+        
+        if (existingUser) {
+          return res.status(400).json({ error: "Este email já está cadastrado" });
+        }
+
+        const { data: newUser, error } = await supabase
+          .from('users')
+          .insert([{ 
+            name, 
+            email, 
+            password: hashedPassword, 
+            role: 'user',
+            points: 0,
+            level: 1,
+            streak: 0
+          }])
+          .select()
+          .single();
+        
+        if (error) throw error;
+
+        // Sync to SQLite
+        db.prepare("INSERT OR REPLACE INTO users (id, name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+          newUser.id, name, email, hashedPassword, 'user', 0, 1, 0
+        );
+
+        return res.json(newUser);
+      }
+
+      // SQLite only fallback
+      const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Este email já está cadastrado" });
+      }
+
+      const result = db.prepare("INSERT INTO users (name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+        name, email, hashedPassword, 'user', 0, 1, 0
+      );
+      
+      const newUser = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
+      res.json(newUser);
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      res.status(500).json({ error: err.message || "Erro ao realizar cadastro" });
+    }
+  });
+
+  // Admin GET endpoints (always SQLite for consistency)
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const users = db.prepare(`
+        SELECT u.*, t.name as team_name 
+        FROM users u 
+        LEFT JOIN teams t ON u.team_id = t.id 
+        ORDER BY u.points DESC
+      `).all();
+      res.json(users);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/admin/teams", async (req, res) => {
+    try {
+      const teams = db.prepare(`
+        SELECT t.*, (SELECT COUNT(*) FROM users WHERE team_id = t.id) as member_count 
+        FROM teams t
+        ORDER BY t.total_points DESC
+      `).all();
+      res.json(teams);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/admin/tasks", async (req, res) => {
+    try {
+      const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
+      res.json(tasks);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get("/api/users", async (req, res) => {
     if (supabase) {
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('*, teams(name)')
-        .order('points', { ascending: false });
-      
-      if (!error) {
-        console.log(`Fetched ${users.length} users from Supabase`);
-        const formattedUsers = users.map(u => ({
-          ...u,
-          team_name: u.teams?.name || null
-        }));
-        return res.json(formattedUsers);
-      } else {
-        console.error("Supabase error fetching users:", error.message);
-        const fs = await import('fs');
-        fs.appendFileSync('supabase_errors.log', `${new Date().toISOString()} - Users: ${error.message}\n`);
+      try {
+        const { data: users, error } = await supabase
+          .from('users')
+          .select('*, teams(name)')
+          .order('points', { ascending: false });
+        
+        if (!error) {
+          console.log(`Fetched ${users.length} users from Supabase`);
+          const formattedUsers = users.map(u => ({
+            ...u,
+            team_name: u.teams?.name || null
+          }));
+          return res.json(formattedUsers);
+        } else {
+          console.error("Supabase error fetching users:", error.message);
+        }
+      } catch (supaErr: any) {
+        console.error("Supabase connection error fetching users:", supaErr.message);
       }
     }
 
@@ -351,95 +453,82 @@ async function startServer() {
 
   app.put("/api/admin/users/:id", async (req, res) => {
     const { name, email, password, role, team_id, points, level, streak } = req.body;
+    const userId = req.params.id;
     try {
       let hashedPassword = password;
       if (password && !password.startsWith('$2a$') && !password.startsWith('$2b$')) {
         hashedPassword = await bcrypt.hash(password, 10);
       }
 
-      if (supabase) {
-        const updateData: any = { name, email, role, team_id, points, level, streak };
-        if (password) updateData.password = hashedPassword;
-        
-        const { error } = await supabase
-          .from('users')
-          .update(updateData)
-          .eq('id', req.params.id);
-        
-        if (!error) {
-          if (password) {
-            db.prepare(`
-              UPDATE users 
-              SET name = ?, email = ?, password = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ? 
-              WHERE id = ?
-            `).run(name, email, hashedPassword, role, team_id, points, level, streak, req.params.id);
-          } else {
-            db.prepare(`
-              UPDATE users 
-              SET name = ?, email = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ? 
-              WHERE id = ?
-            `).run(name, email, role, team_id, points, level, streak, req.params.id);
-          }
-          return res.json({ success: true });
-        }
-      }
-
+      // Always update SQLite
       if (password) {
         db.prepare(`
           UPDATE users 
           SET name = ?, email = ?, password = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ? 
           WHERE id = ?
-        `).run(name, email, hashedPassword, role, team_id, points, level, streak, req.params.id);
+        `).run(name, email, hashedPassword, role, team_id, points, level, streak, userId);
       } else {
         db.prepare(`
           UPDATE users 
           SET name = ?, email = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ? 
           WHERE id = ?
-        `).run(name, email, role, team_id, points, level, streak, req.params.id);
+        `).run(name, email, role, team_id, points, level, streak, userId);
       }
+
+      // Attempt Supabase update if configured
+      if (supabase) {
+        const updateData: any = { name, email, role, team_id, points, level, streak };
+        if (password) updateData.password = hashedPassword;
+        
+        try {
+          const { error } = await supabase
+            .from('users')
+            .update(updateData)
+            .eq('id', userId);
+          
+          if (error) {
+            console.error("Supabase update error (logged but continuing):", error.message);
+            // We don't return error here because SQLite was successful
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during update:", supaErr.message);
+        }
+      }
+
       res.json({ success: true });
     } catch (err: any) {
+      console.error("Error updating user:", err);
       res.status(400).json({ error: err.message });
     }
   });
 
   app.delete("/api/admin/users/:id", async (req, res) => {
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId)) return res.status(400).json({ error: "Invalid user ID" });
-
+    const userId = req.params.id;
+    
     try {
-      if (supabase) {
-        const { error } = await supabase.from('users').delete().eq('id', userId);
-        if (!error) {
-          const deleteUser = db.transaction(() => {
-            db.prepare("DELETE FROM user_tasks WHERE user_id = ?").run(userId);
-            db.prepare("DELETE FROM attendances WHERE user_id = ?").run(userId);
-            db.prepare("DELETE FROM daily_quizzes WHERE user_id = ?").run(userId);
-            db.prepare("DELETE FROM user_trees WHERE user_id = ?").run(userId);
-            db.prepare("UPDATE teams SET leader_id = NULL WHERE leader_id = ?").run(userId);
-            db.prepare("DELETE FROM users WHERE id = ?").run(userId);
-          });
-          deleteUser();
-          return res.json({ success: true });
-        }
-      }
-
+      // Always update SQLite first
       const deleteUser = db.transaction(() => {
-        // Remove related records
         db.prepare("DELETE FROM user_tasks WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM attendances WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM daily_quizzes WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM user_trees WHERE user_id = ?").run(userId);
-        
-        // Clear leader_id in teams if this user was a leader
         db.prepare("UPDATE teams SET leader_id = NULL WHERE leader_id = ?").run(userId);
-        
-        // Finally delete the user
-        const result = db.prepare("DELETE FROM users WHERE id = ?").run(userId);
-        if (result.changes === 0) throw new Error("User not found");
+        db.prepare("DELETE FROM users WHERE id = ?").run(userId);
       });
-      
       deleteUser();
+
+      // Attempt Supabase delete if configured
+      if (supabase) {
+        try {
+          const { error } = await supabase.from('users').delete().eq('id', userId);
+          if (error) {
+            console.error("Supabase delete error (logged but continuing):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during delete:", supaErr.message);
+        }
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       console.error("Error deleting user:", err);
@@ -447,26 +536,29 @@ async function startServer() {
     }
   });
 
-  // Teams
   app.get("/api/teams", async (req, res) => {
     if (supabase) {
-      const { data: teams, error } = await supabase
-        .from('teams')
-        .select(`
-          *,
-          users!team_id (id)
-        `)
-        .order('total_points', { ascending: false });
-      
-      if (!error) {
-        console.log(`Fetched ${teams.length} teams from Supabase`);
-        const formattedTeams = teams.map(t => ({
-          ...t,
-          member_count: t.users?.length || 0
-        }));
-        return res.json(formattedTeams);
-      } else {
-        console.error("Supabase error fetching teams:", error.message);
+      try {
+        const { data: teams, error } = await supabase
+          .from('teams')
+          .select(`
+            *,
+            users!team_id (id)
+          `)
+          .order('total_points', { ascending: false });
+        
+        if (!error) {
+          console.log(`Fetched ${teams.length} teams from Supabase`);
+          const formattedTeams = teams.map(t => ({
+            ...t,
+            member_count: t.users?.length || 0
+          }));
+          return res.json(formattedTeams);
+        } else {
+          console.error("Supabase error fetching teams:", error.message);
+        }
+      } catch (supaErr: any) {
+        console.error("Supabase connection error fetching teams:", supaErr.message);
       }
     }
 
@@ -538,28 +630,31 @@ async function startServer() {
 
   app.put("/api/admin/teams/:id", async (req, res) => {
     const { name, color, description, leader_id, total_points, photo } = req.body;
+    const teamId = req.params.id;
     try {
-      if (supabase) {
-        const { error } = await supabase
-          .from('teams')
-          .update({ name, color, description, leader_id, total_points, photo })
-          .eq('id', req.params.id);
-        
-        if (!error) {
-          db.prepare(`
-            UPDATE teams 
-            SET name = ?, color = ?, description = ?, leader_id = ?, total_points = ?, photo = ? 
-            WHERE id = ?
-          `).run(name, color, description, leader_id, total_points, photo, req.params.id);
-          return res.json({ success: true });
-        }
-      }
-
+      // Always update SQLite
       db.prepare(`
         UPDATE teams 
         SET name = ?, color = ?, description = ?, leader_id = ?, total_points = ?, photo = ? 
         WHERE id = ?
-      `).run(name, color, description, leader_id, total_points, photo, req.params.id);
+      `).run(name, color, description, leader_id, total_points, photo, teamId);
+
+      // Attempt Supabase update
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('teams')
+            .update({ name, color, description, leader_id, total_points, photo })
+            .eq('id', teamId);
+          
+          if (error) {
+            console.error("Supabase team update error (logged):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during team update:", supaErr.message);
+        }
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -567,30 +662,27 @@ async function startServer() {
   });
 
   app.delete("/api/admin/teams/:id", async (req, res) => {
-    const teamId = parseInt(req.params.id);
-    if (isNaN(teamId)) return res.status(400).json({ error: "Invalid team ID" });
-
+    const teamId = req.params.id;
     try {
+      // Always update SQLite first
+      const deleteTeam = db.transaction(() => {
+        db.prepare("UPDATE users SET team_id = NULL WHERE team_id = ?").run(teamId);
+        db.prepare("DELETE FROM teams WHERE id = ?").run(teamId);
+      });
+      deleteTeam();
+
+      // Attempt Supabase delete
       if (supabase) {
-        const { error } = await supabase.from('teams').delete().eq('id', teamId);
-        if (!error) {
-          const deleteTeam = db.transaction(() => {
-            db.prepare("UPDATE users SET team_id = NULL WHERE team_id = ?").run(teamId);
-            db.prepare("DELETE FROM teams WHERE id = ?").run(teamId);
-          });
-          deleteTeam();
-          return res.json({ success: true });
+        try {
+          const { error } = await supabase.from('teams').delete().eq('id', teamId);
+          if (error) {
+            console.error("Supabase team delete error (logged):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during team delete:", supaErr.message);
         }
       }
 
-      const deleteTeam = db.transaction(() => {
-        // Set team_id to NULL for all users in this team
-        db.prepare("UPDATE users SET team_id = NULL WHERE team_id = ?").run(teamId);
-        // Finally delete the team
-        const result = db.prepare("DELETE FROM teams WHERE id = ?").run(teamId);
-        if (result.changes === 0) throw new Error("Team not found");
-      });
-      deleteTeam();
       res.json({ success: true });
     } catch (err: any) {
       console.error("Error deleting team:", err);
@@ -598,14 +690,17 @@ async function startServer() {
     }
   });
 
-  // Tasks
   app.get("/api/tasks", async (req, res) => {
     if (supabase) {
-      const { data: tasks, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (!error) return res.json(tasks);
+      try {
+        const { data: tasks, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error) return res.json(tasks);
+      } catch (supaErr: any) {
+        console.error("Supabase connection error fetching tasks:", supaErr.message);
+      }
     }
     const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
     res.json(tasks);
@@ -614,26 +709,32 @@ async function startServer() {
   app.post("/api/admin/tasks", async (req, res) => {
     const { title, description, points, category, type, available_from, deadline } = req.body;
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from('tasks')
-          .insert([{ title, description, points, category, type, available_from: available_from || null, deadline: deadline || null }])
-          .select()
-          .single();
-        if (!error) {
-          db.prepare(`
-            INSERT INTO tasks (id, title, description, points, category, type, available_from, deadline) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(data.id, title, description, points, category, type, available_from || null, deadline || null);
-          return res.json({ id: data.id });
-        }
-      }
+      // Always update SQLite first
       const result = db.prepare(`
         INSERT INTO tasks (title, description, points, category, type, available_from, deadline) 
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(title, description, points, category, type, available_from || null, deadline || null);
-      res.json({ id: result.lastInsertRowid });
+      
+      const taskId = result.lastInsertRowid;
+
+      // Attempt Supabase insert
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('tasks')
+            .insert([{ id: taskId, title, description, points, category, type, available_from: available_from || null, deadline: deadline || null }]);
+          
+          if (error) {
+            console.error("Supabase task create error (logged):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during task creation:", supaErr.message);
+        }
+      }
+
+      res.json({ id: taskId });
     } catch (err: any) {
+      console.error("Error creating task:", err);
       res.status(400).json({ error: err.message });
     }
   });
@@ -671,33 +772,64 @@ async function startServer() {
     }
   });
 
-  app.put("/api/admin/tasks/:id", (req, res) => {
+  app.put("/api/admin/tasks/:id", async (req, res) => {
     const { title, description, points, category, type, available_from, deadline, is_active } = req.body;
+    const taskId = req.params.id;
     try {
-      db.prepare(`
+      // Always update SQLite
+      const result = db.prepare(`
         UPDATE tasks 
         SET title = ?, description = ?, points = ?, category = ?, type = ?, available_from = ?, deadline = ?, is_active = ? 
         WHERE id = ?
-      `).run(title, description, points, category, type, available_from, deadline, is_active, req.params.id);
+      `).run(title, description, points, category, type, available_from || null, deadline || null, is_active ?? 1, taskId);
+
+      console.log(`Task update result: ${result.changes} changes for ID ${taskId}`);
+
+      // Attempt Supabase update
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('tasks')
+            .update({ title, description, points, category, type, available_from: available_from || null, deadline: deadline || null, is_active: is_active ?? 1 })
+            .eq('id', taskId);
+          
+          if (error) {
+            console.error("Supabase task update error (logged):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during task update:", supaErr.message);
+        }
+      }
+
       res.json({ success: true });
     } catch (err: any) {
+      console.error("Error updating task:", err);
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.delete("/api/admin/tasks/:id", (req, res) => {
-    const taskId = parseInt(req.params.id);
-    if (isNaN(taskId)) return res.status(400).json({ error: "Invalid task ID" });
-
+  app.delete("/api/admin/tasks/:id", async (req, res) => {
+    const taskId = req.params.id;
     try {
+      // Always update SQLite first
       const deleteTask = db.transaction(() => {
-        // Remove related user_tasks first
         db.prepare("DELETE FROM user_tasks WHERE task_id = ?").run(taskId);
-        // Finally delete the task
-        const result = db.prepare("DELETE FROM tasks WHERE id = ?").run(taskId);
-        if (result.changes === 0) throw new Error("Task not found");
+        db.prepare("DELETE FROM tasks WHERE id = ?").run(taskId);
       });
       deleteTask();
+
+      // Attempt Supabase delete
+      if (supabase) {
+        try {
+          const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+          if (error) {
+            console.error("Supabase task delete error (logged):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during task delete:", supaErr.message);
+        }
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       console.error("Error deleting task:", err);
@@ -722,23 +854,27 @@ async function startServer() {
 
   app.get("/api/admin/pending-tasks", async (req, res) => {
     if (supabase) {
-      const { data: pending, error } = await supabase
-        .from('user_tasks')
-        .select(`
-          *,
-          users (name),
-          tasks (title, points)
-        `)
-        .eq('status', 'pending');
-      
-      if (!error) {
-        const formatted = pending.map(p => ({
-          ...p,
-          user_name: p.users?.name,
-          task_title: p.tasks?.title,
-          points: p.tasks?.points
-        }));
-        return res.json(formatted);
+      try {
+        const { data: pending, error } = await supabase
+          .from('user_tasks')
+          .select(`
+            *,
+            users (name),
+            tasks (title, points)
+          `)
+          .eq('status', 'pending');
+        
+        if (!error) {
+          const formatted = pending.map(p => ({
+            ...p,
+            user_name: p.users?.name,
+            task_title: p.tasks?.title,
+            points: p.tasks?.points
+          }));
+          return res.json(formatted);
+        }
+      } catch (supaErr: any) {
+        console.error("Supabase connection error fetching pending tasks:", supaErr.message);
       }
     }
     const pending = db.prepare(`
@@ -754,81 +890,128 @@ async function startServer() {
   app.post("/api/admin/verify-task", async (req, res) => {
     const { userTaskId, status } = req.body; // status: 'verified' or 'rejected'
     
-    if (supabase) {
-      const { data: userTask, error: fetchError } = await supabase
-        .from('user_tasks')
-        .select('*, tasks(points)')
-        .eq('id', userTaskId)
-        .single();
+    try {
+      const userTask = db.prepare("SELECT * FROM user_tasks WHERE id = ?").get(userTaskId);
+      if (!userTask) return res.status(404).json({ error: "Task not found" });
 
-      if (!fetchError && userTask) {
-        const { error: updateError } = await supabase
-          .from('user_tasks')
-          .update({ status, verified_at: new Date().toISOString() })
-          .eq('id', userTaskId);
+      // Always update SQLite
+      db.prepare("UPDATE user_tasks SET status = ?, verified_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, userTaskId);
 
-        if (!updateError && status === 'verified') {
-          const points = userTask.tasks?.points || 0;
-          // Update user points
-          const { data: userData } = await supabase.rpc('increment_user_points', { row_id: userTask.user_id, amount: points });
-          
-          // Update team points if user has team
-          const { data: userWithTeam } = await supabase.from('users').select('team_id').eq('id', userTask.user_id).single();
-          if (userWithTeam?.team_id) {
-            await supabase.rpc('increment_team_points', { row_id: userWithTeam.team_id, amount: points });
-          }
-        }
+      let points = 0;
+      if (status === 'verified') {
+        const task = db.prepare("SELECT points FROM tasks WHERE id = ?").get(userTask.task_id);
+        points = task.points;
+        db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(points, userTask.user_id);
         
-        // Sync to SQLite
-        db.prepare("UPDATE user_tasks SET status = ?, verified_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, userTaskId);
-        if (status === 'verified') {
-          const points = userTask.tasks?.points || 0;
-          db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(points, userTask.user_id);
-          const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userTask.user_id);
-          if (user?.team_id) {
-            db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(points, user.team_id);
-          }
+        const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userTask.user_id);
+        if (user && user.team_id) {
+          db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(points, user.team_id);
         }
-        return res.json({ success: true });
       }
-    }
 
-    const userTask = db.prepare("SELECT * FROM user_tasks WHERE id = ?").get(userTaskId);
-    if (!userTask) return res.status(404).json({ error: "Task not found" });
+      // Attempt Supabase update
+      if (supabase) {
+        try {
+          const { error: updateError } = await supabase
+            .from('user_tasks')
+            .update({ status, verified_at: new Date().toISOString() })
+            .eq('id', userTaskId);
 
-    db.prepare("UPDATE user_tasks SET status = ?, verified_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, userTaskId);
-
-    if (status === 'verified') {
-      const task = db.prepare("SELECT points FROM tasks WHERE id = ?").get(userTask.task_id);
-      db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(task.points, userTask.user_id);
-      
-      const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userTask.user_id);
-      if (user.team_id) {
-        db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(task.points, user.team_id);
+          if (!updateError && status === 'verified') {
+            // Update user points in Supabase
+            await supabase.rpc('increment_user_points', { row_id: userTask.user_id, amount: points });
+            
+            // Update team points if user has team
+            const { data: userWithTeam } = await supabase.from('users').select('team_id').eq('id', userTask.user_id).single();
+            if (userWithTeam?.team_id) {
+              await supabase.rpc('increment_team_points', { row_id: userWithTeam.team_id, amount: points });
+            }
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during task verification:", supaErr.message);
+        }
       }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Error verifying task:", err);
+      res.status(400).json({ error: err.message });
     }
-    res.json({ success: true });
   });
 
   // Attendance
+  app.get("/api/admin/sessions", async (req, res) => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('attendance_sessions')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error) return res.json(data);
+      } catch (supaErr: any) {
+        console.error("Supabase connection error fetching sessions:", supaErr.message);
+      }
+    }
+    const sessions = db.prepare("SELECT * FROM attendance_sessions ORDER BY created_at DESC").all();
+    res.json(sessions);
+  });
+
+  app.delete("/api/admin/sessions/:id", async (req, res) => {
+    const sessionId = req.params.id;
+    try {
+      // Always update SQLite first
+      const deleteSession = db.transaction(() => {
+        db.prepare("DELETE FROM attendances WHERE session_id = ?").run(sessionId);
+        db.prepare("DELETE FROM attendance_sessions WHERE id = ?").run(sessionId);
+      });
+      deleteSession();
+
+      // Attempt Supabase delete
+      if (supabase) {
+        try {
+          const { error } = await supabase.from('attendance_sessions').delete().eq('id', sessionId);
+          if (error) {
+            console.error("Supabase session delete error (logged):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during session delete:", supaErr.message);
+        }
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.post("/api/admin/create-session", async (req, res) => {
     const { eventType, points, maxCheckins } = req.body;
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('attendance_sessions')
-        .insert([{ event_type: eventType, code, points, max_checkins: maxCheckins }])
-        .select()
-        .single();
-      if (!error) {
-        db.prepare("INSERT INTO attendance_sessions (id, event_type, code, points, max_checkins) VALUES (?, ?, ?, ?, ?)").run(data.id, eventType, code, points, maxCheckins);
-        return res.json({ id: data.id, code });
-      }
-    }
+    try {
+      // Always update SQLite
+      const result = db.prepare("INSERT INTO attendance_sessions (event_type, code, points, max_checkins) VALUES (?, ?, ?, ?)").run(eventType, code, points, maxCheckins);
+      const sessionId = result.lastInsertRowid;
 
-    const result = db.prepare("INSERT INTO attendance_sessions (event_type, code, points, max_checkins) VALUES (?, ?, ?, ?)").run(eventType, code, points, maxCheckins);
-    res.json({ id: result.lastInsertRowid, code });
+      // Attempt Supabase insert
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('attendance_sessions')
+            .insert([{ id: sessionId, event_type: eventType, code, points, max_checkins: maxCheckins }]);
+          
+          if (error) {
+            console.error("Supabase session create error (logged):", error.message);
+          }
+        } catch (supaErr: any) {
+          console.error("Supabase connection error during session creation:", supaErr.message);
+        }
+      }
+
+      res.json({ id: sessionId, code });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   app.post("/api/attendance/checkin", async (req, res) => {

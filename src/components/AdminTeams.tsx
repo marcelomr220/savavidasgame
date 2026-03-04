@@ -24,7 +24,7 @@ export default function AdminTeams() {
   }, []);
 
   const fetchTeams = async () => {
-    const res = await fetch('/api/teams');
+    const res = await fetch('/api/admin/teams');
     const data = await res.json();
     setTeams(data);
     setLoading(false);
