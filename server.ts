@@ -11,6 +11,7 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PORT = 3000;
 
 let db: any;
 try {
@@ -180,7 +181,6 @@ if (userCount === 0) {
 export const app = express();
 
 async function startServer() {
-  const PORT = 3000;
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
@@ -1077,67 +1077,6 @@ async function startServer() {
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
-  });
-
-  // Database Sync Endpoints
-  app.post("/api/admin/sync/push", async (req, res) => {
-    if (!supabase) return res.status(400).json({ error: "Supabase não configurado" });
-    
-    const tables = ['teams', 'users', 'tasks', 'user_tasks', 'attendance_sessions', 'attendances', 'biblical_questions', 'daily_quizzes', 'tree_types', 'user_trees', 'app_settings'];
-    const results: any = {};
-
-    for (const table of tables) {
-      try {
-        const data = db.prepare(`SELECT * FROM ${table}`).all();
-        if (data.length > 0) {
-          const { error } = await supabase.from(table).upsert(data);
-          results[table] = error ? { error: error.message } : { success: true, count: data.length };
-        } else {
-          results[table] = { success: true, count: 0 };
-        }
-      } catch (err: any) {
-        results[table] = { error: err.message };
-      }
-    }
-    res.json(results);
-  });
-
-  app.post("/api/admin/sync/pull", async (req, res) => {
-    if (!supabase) return res.status(400).json({ error: "Supabase não configurado" });
-    
-    const tables = ['teams', 'users', 'tasks', 'user_tasks', 'attendance_sessions', 'attendances', 'biblical_questions', 'daily_quizzes', 'tree_types', 'user_trees', 'app_settings'];
-    const results: any = {};
-
-    for (const table of tables) {
-      try {
-        const { data, error } = await supabase.from(table).select('*');
-        if (error) {
-          results[table] = { error: error.message };
-          continue;
-        }
-
-        if (data && data.length > 0) {
-          db.prepare(`DELETE FROM ${table}`).run();
-          const columns = Object.keys(data[0]);
-          const placeholders = columns.map(() => '?').join(',');
-          const insert = db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`);
-          
-          const insertMany = db.transaction((records) => {
-            for (const record of records) {
-              const values = columns.map(col => record[col]);
-              insert.run(...values);
-            }
-          });
-          insertMany(data);
-          results[table] = { success: true, count: data.length };
-        } else {
-          results[table] = { success: true, count: 0 };
-        }
-      } catch (err: any) {
-        results[table] = { error: err.message };
-      }
-    }
-    res.json(results);
   });
 
   app.post("/api/attendance/checkin", async (req, res) => {

@@ -1,5 +1,5 @@
 {
-  "name": "SalvaVidas Meno Church",
+  "name": "SalvaVidas Church",
   "description": "Sistema gamificado de engajamento para comunidade religiosa com rankings, tarefas e mini-games.",
   "requestFramePermissions": ["camera"]
 }
