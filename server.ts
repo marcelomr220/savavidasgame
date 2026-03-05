@@ -11,25 +11,8 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PORT = 3000;
 
-let db: any;
-try {
-  const dbPath = process.env.VERCEL ? "/tmp/community.db" : "community.db";
-  db = new Database(dbPath);
-} catch (err) {
-  console.error("Failed to initialize SQLite database:", err);
-  // Create a mock db object to prevent crashes on routes that use it
-  db = {
-    prepare: () => ({
-      run: () => ({ lastInsertRowid: 0 }),
-      get: () => null,
-      all: () => [],
-    }),
-    exec: () => {},
-    transaction: (fn: any) => fn,
-  };
-}
+const db = new Database("community.db");
 
 // Supabase Client
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -178,9 +161,8 @@ if (userCount === 0) {
     .run("Qual o primeiro livro da Bíblia?", "Êxodo", "Levítico", "Gênesis", "Números", "C", "Antigo Testamento", "Fácil");
 }
 
-export const app = express();
-
 async function startServer() {
+  const app = express();
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
@@ -312,24 +294,9 @@ async function startServer() {
     }
   });
 
-  // Admin GET endpoints (prefer Supabase)
+  // Admin GET endpoints (always SQLite for consistency)
   app.get("/api/admin/users", async (req, res) => {
     try {
-      if (supabase) {
-        const { data: users, error } = await supabase
-          .from('users')
-          .select('*, teams(name)')
-          .order('points', { ascending: false });
-        
-        if (!error && users) {
-          const formattedUsers = users.map(u => ({
-            ...u,
-            team_name: u.teams?.name || null
-          }));
-          return res.json(formattedUsers);
-        }
-      }
-
       const users = db.prepare(`
         SELECT u.*, t.name as team_name 
         FROM users u 
@@ -344,31 +311,6 @@ async function startServer() {
 
   app.get("/api/admin/teams", async (req, res) => {
     try {
-      if (supabase) {
-        const { data: teams, error } = await supabase
-          .from('teams')
-          .select('*')
-          .order('total_points', { ascending: false });
-        
-        if (!error && teams) {
-          // Get member counts
-          const { data: memberCounts, error: countError } = await supabase
-            .from('users')
-            .select('team_id');
-          
-          const counts: Record<number, number> = {};
-          memberCounts?.forEach(u => {
-            if (u.team_id) counts[u.team_id] = (counts[u.team_id] || 0) + 1;
-          });
-
-          const formattedTeams = teams.map(t => ({
-            ...t,
-            member_count: counts[t.id] || 0
-          }));
-          return res.json(formattedTeams);
-        }
-      }
-
       const teams = db.prepare(`
         SELECT t.*, (SELECT COUNT(*) FROM users WHERE team_id = t.id) as member_count 
         FROM teams t
@@ -382,13 +324,6 @@ async function startServer() {
 
   app.get("/api/admin/tasks", async (req, res) => {
     try {
-      if (supabase) {
-        const { data: tasks, error } = await supabase
-          .from('tasks')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!error && tasks) return res.json(tasks);
-      }
       const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
       res.json(tasks);
     } catch (err: any) {
@@ -1306,11 +1241,10 @@ async function startServer() {
     });
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
+  const PORT = 3000;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
 
 startServer();
