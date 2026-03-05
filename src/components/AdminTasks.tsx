@@ -70,6 +70,24 @@ export default function AdminTasks() {
     }
   };
 
+  const safeFormatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Sem data';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Data inválida';
+    return date.toLocaleDateString();
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().slice(0, 16);
+    } catch (e) {
+      return '';
+    }
+  };
+
   const handleOpenModal = (task?: Task) => {
     if (task) {
       setEditingTask(task);
@@ -79,8 +97,8 @@ export default function AdminTasks() {
         points: task.points,
         category: task.category || 'Culto',
         type: task.type || 'Individual',
-        available_from: task.available_from ? new Date(task.available_from).toISOString().slice(0, 16) : '',
-        deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '',
+        available_from: formatDate(task.available_from),
+        deadline: formatDate(task.deadline),
         is_active: Boolean(task.is_active)
       });
     } else {
@@ -365,7 +383,7 @@ export default function AdminTasks() {
                   </div>
                   <div className="flex items-center gap-2 text-stone-400 text-xs font-medium">
                     <Clock size={14} />
-                    <span>Prazo: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'Sem prazo'}</span>
+                    <span>Prazo: {task.deadline ? safeFormatDate(task.deadline) : 'Sem prazo'}</span>
                   </div>
                 </div>
               </div>

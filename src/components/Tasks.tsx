@@ -34,17 +34,38 @@ export default function Tasks({ user }: { user: User }) {
 
   const categories = ['all', 'Culto', 'Célula', 'Especial', 'Desafio'];
 
+  const isAvailable = (available_from?: string) => {
+    if (!available_from) return true;
+    const date = new Date(available_from);
+    if (isNaN(date.getTime())) return true; // Treat invalid date as available
+    return date <= new Date();
+  };
+
   const filteredTasks = tasks.filter(t => {
     const isCategoryMatch = filter === 'all' || t.category === filter;
-    const now = new Date();
-    const isAvailable = !t.available_from || new Date(t.available_from) <= now;
     const isActive = t.is_active !== 0;
-    return isCategoryMatch && isAvailable && isActive;
+    return isCategoryMatch && isAvailable(t.available_from) && isActive;
   });
 
   const isExpired = (deadline?: string) => {
     if (!deadline) return false;
-    return new Date(deadline) < new Date();
+    const date = new Date(deadline);
+    if (isNaN(date.getTime())) return false;
+    return date < new Date();
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Sem data';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Data inválida';
+    return date.toLocaleString();
+  };
+
+  const formatDateShort = (dateStr?: string) => {
+    if (!dateStr) return 'Sem data';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Data inválida';
+    return date.toLocaleDateString();
   };
 
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>;
@@ -108,7 +129,7 @@ export default function Tasks({ user }: { user: User }) {
                 {task.deadline && (
                   <div className={`flex items-center gap-1 mt-2 text-xs font-bold ${isExpired(task.deadline) ? 'text-red-500' : 'text-stone-400'}`}>
                     <Clock size={12} />
-                    <span>Prazo: {new Date(task.deadline).toLocaleString()}</span>
+                    <span>Prazo: {formatDate(task.deadline)}</span>
                     {isExpired(task.deadline) && <span className="ml-1 uppercase">(Expirado)</span>}
                   </div>
                 )}
@@ -216,7 +237,7 @@ export default function Tasks({ user }: { user: User }) {
                         <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Prazo Final</p>
                         <div className={`flex items-center gap-1 font-bold text-sm ${isExpired(selectedTask.deadline) ? 'text-red-500' : 'text-stone-600'}`}>
                           <Clock size={16} />
-                          <span>{new Date(selectedTask.deadline).toLocaleDateString()}</span>
+                          <span>{formatDateShort(selectedTask.deadline)}</span>
                         </div>
                       </div>
                     )}

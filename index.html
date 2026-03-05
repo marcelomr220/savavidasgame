@@ -27,6 +27,20 @@
             console.error('All fetch workarounds failed:', e2);
           }
         }
+        
+        // Additional protection against libraries that try to overwrite fetch
+        const originalDefineProperty = Object.defineProperty;
+        Object.defineProperty = function(obj, prop, descriptor) {
+          if (obj === window && prop === 'fetch') {
+            console.warn('Prevented library from making fetch read-only');
+            return originalDefineProperty(obj, prop, {
+              ...descriptor,
+              writable: true,
+              configurable: true
+            });
+          }
+          return originalDefineProperty.apply(this, arguments);
+        };
       })();
     </script>
   </head>
