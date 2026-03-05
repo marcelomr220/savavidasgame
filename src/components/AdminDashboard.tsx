@@ -87,6 +87,55 @@ export default function AdminDashboard() {
           </div>
         </section>
       </div>
+
+      {/* Database Tools */}
+      <section className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <Database size={20} />
+          </div>
+          <div>
+            <h3 className="font-bold text-stone-900">Ferramentas de Banco de Dados</h3>
+            <p className="text-xs text-stone-500">Sincronize dados entre SQLite local e Supabase remoto.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-2xl border border-stone-100 bg-stone-50/50">
+            <h4 className="text-sm font-bold text-stone-900 mb-1">Restaurar do Supabase</h4>
+            <p className="text-xs text-stone-500 mb-4">Puxa todos os dados do Supabase e substitui o banco local (SQLite). Use isso se o banco local estiver vazio ou desatualizado.</p>
+            <button 
+              onClick={async () => {
+                if (!confirm('Isso irá APAGAR todos os dados locais e substituir pelos dados do Supabase. Continuar?')) return;
+                const res = await fetch('/api/admin/sync/pull', { method: 'POST' });
+                if (res.ok) alert('Restauração concluída com sucesso!');
+                else alert('Erro ao restaurar dados.');
+              }}
+              className="w-full py-2 bg-white border border-stone-200 text-stone-700 rounded-xl text-sm font-bold hover:bg-stone-100 transition-all flex items-center justify-center gap-2"
+            >
+              <TrendingUp className="rotate-180" size={16} />
+              Puxar Dados (Restore)
+            </button>
+          </div>
+
+          <div className="p-4 rounded-2xl border border-stone-100 bg-stone-50/50">
+            <h4 className="text-sm font-bold text-stone-900 mb-1">Migrar para Supabase</h4>
+            <p className="text-xs text-stone-500 mb-4">Envia todos os dados locais para o Supabase. Use isso para fazer backup ou migrar para a nuvem pela primeira vez.</p>
+            <button 
+              onClick={async () => {
+                if (!confirm('Deseja enviar todos os dados locais para o Supabase?')) return;
+                const res = await fetch('/api/admin/sync/push', { method: 'POST' });
+                if (res.ok) alert('Migração concluída com sucesso!');
+                else alert('Erro ao migrar dados.');
+              }}
+              className="w-full py-2 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
+            >
+              <TrendingUp size={16} />
+              Empurrar Dados (Migrate)
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "migrate:supabase": "node migrate_to_supabase.js"
+    "migrate:supabase": "node migrate_to_supabase.js",
+    "restore:supabase": "node restore_from_supabase.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.6",
