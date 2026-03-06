@@ -12,7 +12,12 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database("community.db");
+let db: any;
+try {
+  db = new Database("community.db");
+} catch (e) {
+  console.warn("SQLite database not available, using Supabase only");
+}
 
 // Supabase Client
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -20,135 +25,139 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SU
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 // Initialize Database
-db.exec(`
-  CREATE TABLE IF NOT EXISTS teams (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    color TEXT,
-    leader_id INTEGER,
-    description TEXT,
-    photo TEXT,
-    total_points INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+if (db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS teams (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      color TEXT,
+      leader_id INTEGER,
+      description TEXT,
+      photo TEXT,
+      total_points INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    avatar TEXT,
-    team_id INTEGER,
-    points INTEGER DEFAULT 0,
-    level INTEGER DEFAULT 1,
-    streak INTEGER DEFAULT 0,
-    role TEXT DEFAULT 'user',
-    last_login DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (team_id) REFERENCES teams (id)
-  );
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      avatar TEXT,
+      team_id INTEGER,
+      points INTEGER DEFAULT 0,
+      level INTEGER DEFAULT 1,
+      streak INTEGER DEFAULT 0,
+      role TEXT DEFAULT 'user',
+      last_login DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (team_id) REFERENCES teams (id)
+    );
 
-  CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT,
-    points INTEGER DEFAULT 0,
-    category TEXT, -- 'Culto', 'Célula', 'Especial', 'Desafio'
-    type TEXT, -- 'Individual', 'Equipe', 'Ambos'
-    is_active INTEGER DEFAULT 1,
-    is_recurring TEXT, -- 'daily', 'weekly', 'monthly'
-    available_from DATETIME DEFAULT CURRENT_TIMESTAMP,
-    deadline DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      points INTEGER DEFAULT 0,
+      category TEXT, -- 'Culto', 'Célula', 'Especial', 'Desafio'
+      type TEXT, -- 'Individual', 'Equipe', 'Ambos'
+      is_active INTEGER DEFAULT 1,
+      is_recurring TEXT, -- 'daily', 'weekly', 'monthly'
+      available_from DATETIME DEFAULT CURRENT_TIMESTAMP,
+      deadline DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 
-  CREATE TABLE IF NOT EXISTS user_tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    task_id INTEGER,
-    status TEXT DEFAULT 'pending', -- 'pending', 'completed', 'verified', 'rejected'
-    proof_url TEXT,
-    completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    verified_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users (id),
-    FOREIGN KEY (task_id) REFERENCES tasks (id)
-  );
+    CREATE TABLE IF NOT EXISTS user_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      task_id INTEGER,
+      status TEXT DEFAULT 'pending', -- 'pending', 'completed', 'verified', 'rejected'
+      proof_url TEXT,
+      completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      verified_at DATETIME,
+      FOREIGN KEY (user_id) REFERENCES users (id),
+      FOREIGN KEY (task_id) REFERENCES tasks (id)
+    );
 
-  CREATE TABLE IF NOT EXISTS attendance_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_type TEXT, -- 'Célula Salva', 'Culto Salva', 'Culto Domingo', 'Especial'
-    code TEXT UNIQUE,
-    points INTEGER DEFAULT 10,
-    is_active INTEGER DEFAULT 1,
-    max_checkins INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+    CREATE TABLE IF NOT EXISTS attendance_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT, -- 'Célula Salva', 'Culto Salva', 'Culto Domingo', 'Especial'
+      code TEXT UNIQUE,
+      points INTEGER DEFAULT 10,
+      is_active INTEGER DEFAULT 1,
+      max_checkins INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 
-  CREATE TABLE IF NOT EXISTS attendances (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    session_id INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id),
-    FOREIGN KEY (session_id) REFERENCES attendance_sessions (id)
-  );
+    CREATE TABLE IF NOT EXISTS attendances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      session_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users (id),
+      FOREIGN KEY (session_id) REFERENCES attendance_sessions (id)
+    );
 
-  CREATE TABLE IF NOT EXISTS biblical_questions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    question TEXT NOT NULL,
-    option_a TEXT,
-    option_b TEXT,
-    option_c TEXT,
-    option_d TEXT,
-    correct_option TEXT,
-    category TEXT,
-    difficulty TEXT,
-    is_active INTEGER DEFAULT 1
-  );
+    CREATE TABLE IF NOT EXISTS biblical_questions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      question TEXT NOT NULL,
+      option_a TEXT,
+      option_b TEXT,
+      option_c TEXT,
+      option_d TEXT,
+      correct_option TEXT,
+      category TEXT,
+      difficulty TEXT,
+      is_active INTEGER DEFAULT 1
+    );
 
-  CREATE TABLE IF NOT EXISTS daily_quizzes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    date TEXT,
-    score INTEGER,
-    FOREIGN KEY (user_id) REFERENCES users (id)
-  );
+    CREATE TABLE IF NOT EXISTS daily_quizzes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      date TEXT,
+      score INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    );
 
-  CREATE TABLE IF NOT EXISTS tree_types (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    rarity TEXT, -- 'Comum', 'Rara', 'Épica'
-    max_stages INTEGER DEFAULT 6,
-    points_per_stage INTEGER DEFAULT 5
-  );
+    CREATE TABLE IF NOT EXISTS tree_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      rarity TEXT, -- 'Comum', 'Rara', 'Épica'
+      max_stages INTEGER DEFAULT 6,
+      points_per_stage INTEGER DEFAULT 5
+    );
 
-  CREATE TABLE IF NOT EXISTS user_trees (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    tree_type_id INTEGER,
-    stage INTEGER DEFAULT 1,
-    water_count INTEGER DEFAULT 0,
-    last_watered_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users (id),
-    FOREIGN KEY (tree_type_id) REFERENCES tree_types (id)
-  );
+    CREATE TABLE IF NOT EXISTS user_trees (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      tree_type_id INTEGER,
+      stage INTEGER DEFAULT 1,
+      water_count INTEGER DEFAULT 0,
+      last_watered_at DATETIME,
+      FOREIGN KEY (user_id) REFERENCES users (id),
+      FOREIGN KEY (tree_type_id) REFERENCES tree_types (id)
+    );
 
-  CREATE TABLE IF NOT EXISTS app_settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-`);
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+}
 
 // Helper for adding points to user and team
 async function addPoints(userId: any, amount: number) {
   if (amount <= 0) return;
   
   try {
-    // Update SQLite
-    db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(amount, userId);
-    const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userId);
-    if (user && user.team_id) {
-      db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(amount, user.team_id);
+    // Update SQLite if available
+    if (db) {
+      db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(amount, userId);
+      const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userId);
+      if (user && user.team_id) {
+        db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(amount, user.team_id);
+      }
     }
 
     // Update Supabase
@@ -165,29 +174,30 @@ async function addPoints(userId: any, amount: number) {
 }
 
 // Seed initial data if empty
-const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-if (userCount === 0) {
-  db.prepare("INSERT INTO teams (name, color, description) VALUES (?, ?, ?)").run("Leões de Judá", "#ef4444", "Equipe forte e corajosa");
-  db.prepare("INSERT INTO teams (name, color, description) VALUES (?, ?, ?)").run("Águias do Reino", "#3b82f6", "Visão e renovo");
-  
-  db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Admin", "admin@church.com", "admin123", "admin", 1);
-  db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("João Silva", "joao@church.com", "user123", "user", 1);
-  db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Maria Santos", "maria@church.com", "user123", "user", 2);
+if (db) {
+  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+  if (userCount === 0) {
+    db.prepare("INSERT INTO teams (name, color, description) VALUES (?, ?, ?)").run("Leões de Judá", "#ef4444", "Equipe forte e corajosa");
+    db.prepare("INSERT INTO teams (name, color, description) VALUES (?, ?, ?)").run("Águias do Reino", "#3b82f6", "Visão e renovo");
+    
+    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Admin", "admin@church.com", "admin123", "admin", 1);
+    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("João Silva", "joao@church.com", "user123", "user", 1);
+    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Maria Santos", "maria@church.com", "user123", "user", 2);
 
-  db.prepare("INSERT INTO tasks (title, description, points, category, type) VALUES (?, ?, ?, ?, ?)").run("Ler Salmo 23", "Ler e meditar no Salmo 23", 10, "Desafio", "Individual");
-  db.prepare("INSERT INTO tasks (title, description, points, category, type) VALUES (?, ?, ?, ?, ?)").run("Trazer Visitante", "Trazer um novo amigo para a célula", 50, "Célula", "Individual");
+    db.prepare("INSERT INTO tasks (title, description, points, category, type) VALUES (?, ?, ?, ?, ?)").run("Ler Salmo 23", "Ler e meditar no Salmo 23", 10, "Desafio", "Individual");
+    db.prepare("INSERT INTO tasks (title, description, points, category, type) VALUES (?, ?, ?, ?, ?)").run("Trazer Visitante", "Trazer um novo amigo para a célula", 50, "Célula", "Individual");
 
-  db.prepare("INSERT INTO tree_types (name, rarity, points_per_stage) VALUES (?, ?, ?)").run("Oliveira da Paz", "Comum", 5);
-  db.prepare("INSERT INTO tree_types (name, rarity, points_per_stage) VALUES (?, ?, ?)").run("Cedro do Líbano", "Rara", 10);
+    db.prepare("INSERT INTO tree_types (name, rarity, points_per_stage) VALUES (?, ?, ?)").run("Oliveira da Paz", "Comum", 5);
+    db.prepare("INSERT INTO tree_types (name, rarity, points_per_stage) VALUES (?, ?, ?)").run("Cedro do Líbano", "Rara", 10);
 
-  db.prepare("INSERT INTO biblical_questions (question, option_a, option_b, option_c, option_d, correct_option, category, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-    .run("Quem construiu a arca?", "Moisés", "Noé", "Abraão", "Davi", "B", "Antigo Testamento", "Fácil");
-  db.prepare("INSERT INTO biblical_questions (question, option_a, option_b, option_c, option_d, correct_option, category, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-    .run("Qual o primeiro livro da Bíblia?", "Êxodo", "Levítico", "Gênesis", "Números", "C", "Antigo Testamento", "Fácil");
+    db.prepare("INSERT INTO biblical_questions (question, option_a, option_b, option_c, option_d, correct_option, category, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run("Quem construiu a arca?", "Moisés", "Noé", "Abraão", "Davi", "B", "Antigo Testamento", "Fácil");
+    db.prepare("INSERT INTO biblical_questions (question, option_a, option_b, option_c, option_d, correct_option, category, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run("Qual o primeiro livro da Bíblia?", "Êxodo", "Levítico", "Gênesis", "Números", "C", "Antigo Testamento", "Fácil");
+  }
 }
 
-async function startServer() {
-  const app = express();
+async function startServer(app: any) {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
@@ -1311,9 +1321,12 @@ async function startServer() {
   }
 
   const PORT = 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (process.env.NODE_ENV !== "production") {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+export const app = express();
+startServer(app);
