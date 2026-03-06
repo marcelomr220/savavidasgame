@@ -86,136 +86,170 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-stone-50">
+    <div className="min-h-screen flex flex-col md:flex-row bg-surface">
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-stone-200 sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white">
-            <Star size={20} fill="currentColor" />
+      <div className="md:hidden flex items-center justify-between p-4 bg-surface sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-sm">
+            <Star size={24} fill="currentColor" />
           </div>
-          <span className="font-bold text-stone-800">SalvaVidas</span>
+          <span className="font-bold text-on-surface text-lg">SalvaVidas</span>
         </div>
-        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-stone-600">
-          {isMenuOpen ? <X /> : <Menu />}
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Link to="/admin" className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors">
+              <Settings size={22} />
+            </Link>
+          )}
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors">
+            {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
 
-      {/* Sidebar Navigation */}
-      <AnimatePresence>
-        {(isMenuOpen || window.innerWidth >= 768) && (
-          <motion.aside
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-stone-200 z-40 flex flex-col transition-all duration-300 ${isMenuOpen ? 'block' : 'hidden md:flex'}`}
-          >
-            <div className="p-6 hidden md:flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-200">
-                <Star size={24} fill="currentColor" />
-              </div>
-              <div>
-                <h1 className="font-bold text-stone-900 leading-tight">SalvaVidas</h1>
-                <p className="text-xs text-stone-500">Church Community</p>
-              </div>
-            </div>
+      {/* Sidebar Navigation (Desktop) */}
+      <aside className="hidden md:flex w-72 bg-surface border-r border-surface-variant flex-col p-4">
+        <div className="p-6 flex items-center gap-3 mb-8">
+          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-on-primary shadow-lg">
+            <Star size={28} fill="currentColor" />
+          </div>
+          <div>
+            <h1 className="font-bold text-on-surface text-xl leading-tight">SalvaVidas</h1>
+            <p className="text-xs text-on-surface-variant">Church Community</p>
+          </div>
+        </div>
 
-            <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-              <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-3 mb-2">Menu Principal</div>
-              {navItems.map((item) => (
+        <nav className="flex-1 space-y-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center gap-4 px-4 py-3 rounded-full transition-all duration-200 ${
+                location.pathname === item.path
+                  ? 'bg-secondary-container text-on-secondary-container font-semibold'
+                  : 'text-on-surface-variant hover:bg-surface-variant'
+              }`}
+            >
+              <item.icon size={22} />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+
+          {isAdmin && (
+            <div className="pt-4 mt-4 border-t border-surface-variant">
+              <p className="px-4 mb-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Administração</p>
+              {adminItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-                    location.pathname === item.path
-                      ? 'bg-red-50 text-red-700 font-medium'
-                      : 'text-stone-600 hover:bg-stone-100'
+                  className={`flex items-center gap-4 px-4 py-3 rounded-full transition-all duration-200 ${
+                    location.pathname.startsWith(item.path)
+                      ? 'bg-primary text-on-primary font-semibold'
+                      : 'text-on-surface-variant hover:bg-surface-variant'
                   }`}
                 >
-                  <item.icon size={20} />
+                  <item.icon size={22} />
                   <span>{item.label}</span>
-                  {location.pathname === item.path && (
-                    <motion.div layoutId="activeNav" className="ml-auto w-1.5 h-1.5 rounded-full bg-red-600" />
-                  )}
                 </Link>
               ))}
-
-              {isAdmin && (
-                <>
-                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-3 mt-6 mb-2">Administração</div>
-                  {adminItems.map((item) => (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setIsMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-                        location.pathname.startsWith(item.path)
-                          ? 'bg-stone-900 text-white font-medium'
-                          : 'text-stone-600 hover:bg-stone-100'
-                      }`}
-                    >
-                      <item.icon size={20} />
-                      <span>{item.label}</span>
-                    </Link>
-                  ))}
-                </>
-              )}
-            </nav>
-
-            <div className="p-4 border-t border-stone-100">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 mb-3">
-                <div className="w-10 h-10 rounded-full bg-stone-200 overflow-hidden">
-                  {user?.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-red-100 text-red-700 font-bold">
-                      {user?.name.charAt(0)}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-stone-900 truncate">{user?.name}</p>
-                  <p className="text-xs text-stone-500 truncate">Nível {user?.level}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-stone-600 hover:bg-red-50 hover:text-red-600 transition-colors"
-              >
-                <LogOut size={20} />
-                <span className="text-sm font-medium">Sair</span>
-              </button>
             </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+          )}
+        </nav>
+
+        <div className="mt-auto pt-4 border-t border-surface-variant">
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-variant/50 mb-4">
+            <div className="w-10 h-10 rounded-full bg-primary-container overflow-hidden">
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-on-primary-container font-bold">
+                  {user?.name.charAt(0)}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-on-surface truncate">{user?.name}</p>
+              <p className="text-xs text-on-surface-variant truncate">Nível {user?.level}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-full text-on-surface-variant hover:bg-error-container hover:text-on-error-container transition-colors"
+          >
+            <LogOut size={22} />
+            <span className="font-medium">Sair</span>
+          </button>
+        </div>
+      </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-5xl mx-auto">
-          <Routes>
-            <Route path="/" element={<Dashboard user={user!} />} />
-            <Route path="/teams" element={<Teams user={user!} />} />
-            <Route path="/ranking" element={<IndividualRanking user={user!} />} />
-            <Route path="/tasks" element={<Tasks user={user!} />} />
-            <Route path="/attendance" element={<Attendance user={user!} />} />
-            <Route path="/games/*" element={<Games user={user!} />} />
-            <Route path="/profile" element={<Profile user={user!} onUpdateUser={handleUpdateUser} />} />
-            <Route path="/login" element={<Login onLogin={handleLogin} />} />
-            
-            {/* Admin Routes */}
-            {isAdmin && (
-              <>
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/tasks" element={<AdminTasks />} />
-                <Route path="/admin/attendance" element={<AdminAttendance />} />
-                <Route path="/admin/teams" element={<AdminTeams />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-              </>
-            )}
-          </Routes>
+      <main className="flex-1 overflow-y-auto pb-24 md:pb-8 p-4 md:p-8">
+        <div className="max-w-4xl mx-auto">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Routes location={location}>
+                <Route path="/" element={<Dashboard user={user!} />} />
+                <Route path="/teams" element={<Teams user={user!} />} />
+                <Route path="/ranking" element={<IndividualRanking user={user!} />} />
+                <Route path="/tasks" element={<Tasks user={user!} />} />
+                <Route path="/attendance" element={<Attendance user={user!} />} />
+                <Route path="/games/*" element={<Games user={user!} />} />
+                <Route path="/profile" element={<Profile user={user!} onUpdateUser={handleUpdateUser} />} />
+                <Route path="/login" element={<Login onLogin={handleLogin} />} />
+                
+                {isAdmin && (
+                  <>
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/tasks" element={<AdminTasks />} />
+                    <Route path="/admin/attendance" element={<AdminAttendance />} />
+                    <Route path="/admin/teams" element={<AdminTeams />} />
+                    <Route path="/admin/users" element={<AdminUsers />} />
+                  </>
+                )}
+              </Routes>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
+
+      {/* Bottom Navigation (Mobile) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-surface-variant px-2 py-1 safe-area-bottom z-50 flex justify-around items-center h-16 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+        {navItems.slice(0, 5).map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-2 rounded-2xl transition-all duration-200 ${
+              location.pathname === item.path
+                ? 'text-primary'
+                : 'text-on-surface-variant'
+            }`}
+          >
+            <div className={`p-1.5 rounded-full transition-colors ${location.pathname === item.path ? 'bg-primary-container' : ''}`}>
+              <item.icon size={22} />
+            </div>
+            <span className="text-[10px] font-medium mt-1">{item.label}</span>
+          </Link>
+        ))}
+        <Link
+          to="/profile"
+          className={`flex flex-col items-center justify-center flex-1 py-1 px-2 rounded-2xl transition-all duration-200 ${
+            location.pathname === '/profile'
+              ? 'text-primary'
+              : 'text-on-surface-variant'
+          }`}
+        >
+          <div className={`p-1.5 rounded-full transition-colors ${location.pathname === '/profile' ? 'bg-primary-container' : ''}`}>
+            <UserIcon size={22} />
+          </div>
+          <span className="text-[10px] font-medium mt-1">Perfil</span>
+        </Link>
+      </nav>
     </div>
   );
 }

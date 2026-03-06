@@ -3,8 +3,112 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/login",
+      "destination": "/api/login.ts"
+    },
+    {
+      "source": "/api/register",
+      "destination": "/api/register.ts"
+    },
+    {
+      "source": "/api/users/:id",
+      "destination": "/api/users.ts?id=:id"
+    },
+    {
+      "source": "/api/users",
+      "destination": "/api/users.ts"
+    },
+    {
+      "source": "/api/teams/:id/members",
+      "destination": "/api/teams.ts?id=:id&members=true"
+    },
+    {
+      "source": "/api/teams",
+      "destination": "/api/teams.ts"
+    },
+    {
+      "source": "/api/tasks",
+      "destination": "/api/tasks.ts"
+    },
+    {
+      "source": "/api/tasks/complete",
+      "destination": "/api/tasks.ts?complete=true"
+    },
+    {
+      "source": "/api/admin/stats",
+      "destination": "/api/admin.ts?stats=true"
+    },
+    {
+      "source": "/api/admin/pending-tasks",
+      "destination": "/api/admin.ts?pending=true"
+    },
+    {
+      "source": "/api/admin/create-session",
+      "destination": "/api/admin.ts?createSession=true"
+    },
+    {
+      "source": "/api/admin/recent-activities",
+      "destination": "/api/admin.ts?recent=true"
+    },
+    {
+      "source": "/api/admin/sessions",
+      "destination": "/api/admin.ts?sessions=true"
+    },
+    {
+      "source": "/api/admin/users/:id",
+      "destination": "/api/admin.ts?id=:id&users=true"
+    },
+    {
+      "source": "/api/admin/users",
+      "destination": "/api/admin.ts?users=true"
+    },
+    {
+      "source": "/api/admin/teams/:id",
+      "destination": "/api/admin.ts?id=:id&teams=true"
+    },
+    {
+      "source": "/api/admin/teams",
+      "destination": "/api/admin.ts?teams=true"
+    },
+    {
+      "source": "/api/admin/tasks/:id",
+      "destination": "/api/admin.ts?id=:id&tasks=true"
+    },
+    {
+      "source": "/api/admin/tasks",
+      "destination": "/api/admin.ts?tasks=true"
+    },
+    {
+      "source": "/api/attendance/checkin",
+      "destination": "/api/attendance.ts?checkin=true"
+    },
+    {
+      "source": "/api/quiz/daily",
+      "destination": "/api/quiz.ts?daily=true"
+    },
+    {
+      "source": "/api/quiz/submit",
+      "destination": "/api/quiz.ts?submit=true"
+    },
+    {
+      "source": "/api/tree/user/:userId",
+      "destination": "/api/tree.ts?userId=:userId"
+    },
+    {
+      "source": "/api/tree/plant",
+      "destination": "/api/tree.ts?plant=true"
+    },
+    {
+      "source": "/api/tree/water",
+      "destination": "/api/tree.ts?water=true"
+    },
+    {
+      "source": "/api/tree/types",
+      "destination": "/api/tree.ts?types=true"
+    },
+    {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/$1.ts"
     },
     {
       "source": "/(.*)",

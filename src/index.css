@@ -5,6 +5,78 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  
+  --color-primary: #6750A4;
+  --color-on-primary: #FFFFFF;
+  --color-primary-container: #EADDFF;
+  --color-on-primary-container: #21005D;
+  
+  --color-secondary: #625B71;
+  --color-on-secondary: #FFFFFF;
+  --color-secondary-container: #E8DEF8;
+  --color-on-secondary-container: #1D192B;
+  
+  --color-surface: #FEF7FF;
+  --color-on-surface: #1D1B20;
+  --color-surface-variant: #E7E0EB;
+  --color-on-surface-variant: #49454F;
+  
+  --color-outline: #79747E;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .m3-card {
+    @apply bg-white rounded-xl border border-surface-variant/50 shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  
+  .m3-card-filled {
+    @apply bg-surface-variant rounded-xl transition-opacity hover:opacity-90;
+  }
+  
+  .m3-button-primary {
+    @apply bg-primary text-on-primary px-6 py-2.5 rounded-full font-medium shadow-sm active:shadow-none active:scale-95 transition-all;
+  }
+  
+  .m3-button-tonal {
+    @apply bg-secondary-container text-on-secondary-container px-6 py-2.5 rounded-full font-medium active:scale-95 transition-all;
+  }
+  
+  .m3-nav-item {
+    @apply flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-full transition-colors;
+  }
+  
+  .m3-nav-item-active {
+    @apply bg-secondary-container text-on-secondary-container;
+  }
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Custom scrollbar for mobile feel */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-outline/20 rounded-full;
 }
 
 @layer base {

@@ -27,144 +27,98 @@ export default function Dashboard({ user }: { user: User }) {
   const progress = (user.points % 100);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 pb-4">
       {/* Welcome Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-stone-900">Olá, {user.name}! 👋</h2>
-          <p className="text-stone-500">Que bom ter você aqui hoje.</p>
-        </div>
-        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-stone-200 shadow-sm">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-xl font-bold">
-            <Flame size={18} fill="currentColor" />
-            <span>{user.streak} dias</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl font-bold">
-            <Star size={18} fill="currentColor" />
-            <span>{user.points} pts</span>
-          </div>
-        </div>
+      <header className="flex flex-col gap-1">
+        <h2 className="text-2xl font-bold text-on-surface">Olá, {user.name}! 👋</h2>
+        <p className="text-on-surface-variant">Que bom ter você aqui hoje.</p>
       </header>
 
-      {/* Level Progress */}
-      <section className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm overflow-hidden relative">
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+      {/* Level Progress Card */}
+      <section className="m3-card-filled p-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none text-on-surface-variant">
           <Trophy size={120} />
         </div>
         
-        <div className="flex flex-col md:flex-row gap-6 items-center">
+        <div className="flex flex-col sm:flex-row gap-6 items-center relative z-10">
           {/* Fire Mascot */}
           <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
             <motion.div
               animate={{ 
-                scale: [1 + (progress/100) * 0.5, (1 + (progress/100) * 0.5) * 1.1, 1 + (progress/100) * 0.5],
+                scale: [1 + (progress/100) * 0.3, (1 + (progress/100) * 0.3) * 1.1, 1 + (progress/100) * 0.3],
                 rotate: [-2, 2, -2]
               }}
-              transition={{ 
-                duration: 1.5, 
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               className="relative z-10"
             >
-              <div className="absolute inset-0 bg-orange-500/30 rounded-full blur-xl animate-pulse" />
-              <Flame 
-                size={64} 
-                className="text-orange-500 drop-shadow-[0_0_20px_rgba(249,115,22,0.8)]" 
-                fill="currentColor"
-              />
-              {/* Inner Flame for depth */}
+              <div className="absolute inset-0 bg-orange-500/20 rounded-full blur-xl animate-pulse" />
+              <Flame size={64} className="text-orange-500 drop-shadow-lg" fill="currentColor" />
               <motion.div
                 animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 0.8, repeat: Infinity }}
+                transition={{ duration: 1, repeat: Infinity }}
                 className="absolute inset-0 flex items-center justify-center"
               >
                 <Flame size={32} className="text-yellow-400" fill="currentColor" />
               </motion.div>
             </motion.div>
-            
-            {/* Base of the fire */}
-            <div className="absolute bottom-2 w-12 h-4 bg-stone-100 rounded-[100%] blur-md" />
           </div>
 
           <div className="flex-1 w-full">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Nível Atual</span>
-                <h3 className="text-3xl font-bold text-stone-900">Nível {user.level}</h3>
+                <p className="text-xs font-bold text-primary uppercase tracking-wider">Nível {user.level}</p>
+                <h3 className="text-2xl font-bold text-on-surface">Próximo Nível</h3>
               </div>
               <div className="text-right">
-                <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">Próximo Nível</span>
-                <p className="text-sm font-semibold text-stone-600">{user.points}/{nextLevelPoints} XP</p>
+                <p className="text-sm font-bold text-on-surface-variant">{user.points}/{nextLevelPoints} XP</p>
               </div>
             </div>
-            <div className="h-3 bg-stone-100 rounded-full overflow-hidden">
+            <div className="h-3 bg-surface rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
-                className="h-full bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]"
+                className="h-full bg-primary rounded-full"
               />
             </div>
-            <p className="mt-2 text-xs font-medium text-stone-400 italic">
-              Continue brilhando! Sua chama cresce a cada ponto conquistado.
-            </p>
           </div>
         </div>
       </section>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={CheckCircle2} label="Tarefas" value={stats.completedTasks} color="blue" />
-        <StatCard icon={Calendar} label="Presenças" value={stats.attendanceCount} color="purple" />
-        <StatCard icon={Zap} label="Semanal" value={stats.weeklyPoints} color="amber" />
-        <StatCard icon={Users} label="Equipe" value={user.team_name || 'N/A'} color="rose" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard icon={CheckCircle2} label="Tarefas" value={stats.completedTasks} />
+        <StatCard icon={Calendar} label="Presenças" value={stats.attendanceCount} />
+        <StatCard icon={Zap} label="XP Semanal" value={stats.weeklyPoints} />
+        <StatCard icon={Users} label="Equipe" value={user.team_name || 'N/A'} />
       </div>
 
       {/* Quick Actions */}
       <section>
-        <h3 className="text-lg font-bold text-stone-900 mb-4">Ações Rápidas</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <ActionLink 
-            to="/attendance" 
-            icon={QrCode} 
-            title="Marcar Presença" 
-            desc="Use o QR Code para registrar"
-            color="red"
-          />
-          <ActionLink 
-            to="/games" 
-            icon={Gamepad2} 
-            title="Jogar Agora" 
-            desc="Ganhe pontos com mini-games"
-            color="indigo"
-          />
-          <ActionLink 
-            to="/tasks" 
-            icon={CheckSquare} 
-            title="Ver Tarefas" 
-            desc="Confira suas missões ativas"
-            color="orange"
-          />
+        <h3 className="text-lg font-bold text-on-surface mb-4">Ações Rápidas</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <ActionLink to="/attendance" icon={QrCode} title="Presença" desc="Registrar com QR Code" />
+          <ActionLink to="/games" icon={Gamepad2} title="Jogar" desc="Ganhe pontos extras" />
+          <ActionLink to="/tasks" icon={CheckSquare} title="Missões" desc="Confira suas tarefas" />
         </div>
       </section>
 
-      {/* Recent Activity (Placeholder) */}
-      <section className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-stone-100 flex items-center justify-between">
-          <h3 className="font-bold text-stone-900">Atividades Recentes</h3>
-          <button className="text-sm text-red-600 font-semibold hover:underline">Ver tudo</button>
+      {/* Recent Activity */}
+      <section className="m3-card overflow-hidden">
+        <div className="p-4 border-b border-surface-variant/30 flex items-center justify-between">
+          <h3 className="font-bold text-on-surface">Atividades Recentes</h3>
+          <button className="text-sm text-primary font-bold hover:bg-primary-container/20 px-3 py-1 rounded-full transition-colors">Ver tudo</button>
         </div>
-        <div className="divide-y divide-stone-50">
+        <div className="divide-y divide-surface-variant/20">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="p-4 flex items-center gap-4 hover:bg-stone-50 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+            <div key={i} className="p-4 flex items-center gap-4 active:bg-surface-variant/30 transition-colors cursor-pointer">
+              <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
                 <CheckCircle2 size={20} />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-stone-900">Tarefa Concluída: Ler Salmo 23</p>
-                <p className="text-xs text-stone-500">Há 2 horas • +10 pts</p>
+                <p className="text-sm font-semibold text-on-surface">Tarefa Concluída: Ler Salmo 23</p>
+                <p className="text-xs text-on-surface-variant">Há 2 horas • +10 pts</p>
               </div>
-              <ChevronRight size={16} className="text-stone-300" />
+              <ChevronRight size={18} className="text-outline" />
             </div>
           ))}
         </div>
@@ -173,42 +127,30 @@ export default function Dashboard({ user }: { user: User }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: any) {
-  const colors: any = {
-    blue: 'bg-blue-50 text-blue-600',
-    purple: 'bg-purple-50 text-purple-600',
-    amber: 'bg-amber-50 text-amber-600',
-    rose: 'bg-rose-50 text-rose-600',
-    red: 'bg-red-50 text-red-600',
-  };
-
+function StatCard({ icon: Icon, label, value }: any) {
   return (
-    <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
-      <div className={`w-8 h-8 rounded-lg ${colors[color]} flex items-center justify-center mb-3`}>
+    <div className="m3-card p-4 flex flex-col gap-2">
+      <div className="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center">
         <Icon size={18} />
       </div>
-      <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">{label}</p>
-      <p className="text-lg font-bold text-stone-900 truncate">{value}</p>
+      <div>
+        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{label}</p>
+        <p className="text-base font-bold text-on-surface truncate">{value}</p>
+      </div>
     </div>
   );
 }
 
-function ActionLink({ to, icon: Icon, title, desc, color }: any) {
-  const colors: any = {
-    red: 'bg-red-500 shadow-red-200',
-    indigo: 'bg-indigo-500 shadow-indigo-200',
-    orange: 'bg-orange-500 shadow-orange-200',
-  };
-
+function ActionLink({ to, icon: Icon, title, desc }: any) {
   return (
     <Link to={to} className="group">
-      <div className="bg-white p-5 rounded-3xl border border-stone-200 shadow-sm hover:border-red-200 hover:shadow-md transition-all duration-300 flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-2xl ${colors[color]} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+      <div className="m3-card p-4 flex items-center gap-4 active:scale-95 transition-transform">
+        <div className="w-12 h-12 rounded-2xl bg-secondary text-on-secondary flex items-center justify-center shadow-sm">
           <Icon size={24} />
         </div>
         <div>
-          <h4 className="font-bold text-stone-900 group-hover:text-red-600 transition-colors">{title}</h4>
-          <p className="text-xs text-stone-500">{desc}</p>
+          <h4 className="font-bold text-on-surface">{title}</h4>
+          <p className="text-xs text-on-surface-variant">{desc}</p>
         </div>
       </div>
     </Link>
