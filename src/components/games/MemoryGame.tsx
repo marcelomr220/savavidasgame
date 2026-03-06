@@ -14,6 +14,8 @@ const CHARACTERS = [
   { id: 8, name: 'Paulo', icon: '✉️' },
 ];
 
+import { submitQuiz } from '../../services/api';
+
 export default function MemoryGame({ user }: { user: User }) {
   const [cards, setCards] = useState<any[]>([]);
   const [flipped, setFlipped] = useState<number[]>([]);
@@ -70,11 +72,11 @@ export default function MemoryGame({ user }: { user: User }) {
 
   const submitScore = async () => {
     // Memory game gives 20 points
-    await fetch('/api/quiz/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, score: 20 }),
-    });
+    try {
+      await submitQuiz(user.id, 20);
+    } catch (err) {
+      console.error("Error submitting memory game score:", err);
+    }
   };
 
   const formatTime = (s: number) => {

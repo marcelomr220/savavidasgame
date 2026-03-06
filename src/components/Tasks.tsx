@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckSquare, Clock, Star, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Task, User } from '../types';
+import { getTasks, completeTask } from '../services/api';
 
 export default function Tasks({ user }: { user: User }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -11,24 +12,26 @@ export default function Tasks({ user }: { user: User }) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   useEffect(() => {
-    fetch('/api/tasks')
-      .then(res => res.json())
+    getTasks()
       .then(data => {
         setTasks(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching tasks:", err);
         setLoading(false);
       });
   }, []);
 
   const handleComplete = async (taskId: number) => {
     setCompleting(taskId);
-    const res = await fetch('/api/tasks/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, taskId }),
-    });
-    if (res.ok) {
+    try {
+      await completeTask(user.id, taskId, ''); // Empty proofUrl for now
       // Show success feedback
       setTimeout(() => setCompleting(null), 1500);
+    } catch (err) {
+      console.error("Error completing task:", err);
+      setCompleting(null);
     }
   };
 

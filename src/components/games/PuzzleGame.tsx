@@ -2,18 +2,19 @@ import React, { useState } from 'react';
 import { Puzzle, Star, CheckCircle2, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../../types';
+import { submitQuiz } from '../../services/api';
 
 export default function PuzzleGame({ user }: { user: User }) {
   const [finished, setFinished] = useState(false);
 
   // Simplified puzzle simulation for now
   const handleFinish = async () => {
-    setFinished(true);
-    await fetch('/api/quiz/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, score: 25 }),
-    });
+    try {
+      await submitQuiz(user.id, 25);
+      setFinished(true);
+    } catch (err) {
+      console.error("Error submitting puzzle game score:", err);
+    }
   };
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Star, Search } from 'lucide-react';
 import { User } from '../types';
+import { getUsers } from '../services/api';
 
 export default function IndividualRanking({ user }: { user: User }) {
   const [rankings, setRankings] = useState<User[]>([]);
@@ -8,10 +9,13 @@ export default function IndividualRanking({ user }: { user: User }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetch('/api/users')
-      .then(res => res.json())
+    getUsers()
       .then(data => {
         setRankings(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching rankings:", err);
         setLoading(false);
       });
   }, []);

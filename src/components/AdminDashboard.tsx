@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { getAdminStats, getRecentActivities } from '../services/api';
+import { supabase } from '../lib/supabase';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -21,20 +23,14 @@ export default function AdminDashboard() {
     monthlyAttendance: 0,
   });
   const [activities, setActivities] = useState<any[]>([]);
-  const [supabaseStatus, setSupabaseStatus] = useState<{configured: boolean, url: string | null}>({ configured: false, url: null });
+  const [supabaseStatus, setSupabaseStatus] = useState<{configured: boolean, url: string | null}>({ configured: true, url: 'Supabase' });
 
   useEffect(() => {
-    fetch('/api/supabase/status')
-      .then(res => res.json())
-      .then(data => setSupabaseStatus(data));
-    
-    fetch('/api/admin/stats')
-      .then(res => res.json())
+    getAdminStats()
       .then(data => setStats(data))
       .catch(err => console.error("Error fetching stats:", err));
 
-    fetch('/api/admin/recent-activities')
-      .then(res => res.json())
+    getRecentActivities()
       .then(data => setActivities(data))
       .catch(err => console.error("Error fetching activities:", err));
   }, []);

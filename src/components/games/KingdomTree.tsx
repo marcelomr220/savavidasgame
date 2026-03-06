@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TreeDeciduous, Droplets, Star, Flame, Sparkles, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, UserTree } from '../../types';
+import { getUserTrees, plantTree, waterTree } from '../../services/api';
 
 export default function KingdomTree({ user }: { user: User }) {
   const [tree, setTree] = useState<UserTree | null>(null);
@@ -14,33 +15,32 @@ export default function KingdomTree({ user }: { user: User }) {
   }, []);
 
   const fetchTree = async () => {
-    const res = await fetch(`/api/tree/user/${user.id}`);
-    const data = await res.json();
-    setTree(data);
-    setLoading(false);
+    try {
+      const data = await getUserTrees(user.id);
+      setTree(data[0] || null);
+    } catch (err) {
+      console.error("Error fetching tree:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePlant = async (treeTypeId: number) => {
-    const res = await fetch('/api/tree/plant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, treeTypeId }),
-    });
-    if (res.ok) fetchTree();
+    try {
+      await plantTree(user.id, treeTypeId);
+      fetchTree();
+    } catch (err) {
+      console.error("Error planting tree:", err);
+    }
   };
 
   const handleWater = async () => {
     if (!tree || watering) return;
     setWatering(true);
     
-    const res = await fetch('/api/tree/water', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, treeId: tree.id }),
-    });
-    const data = await res.json();
-    
-    if (res.ok) {
+    try {
+      const data = await waterTree(user.id, tree.id);
+      
       if (data.pointsEarned > 0) {
         setFeedback(`Evoluiu! +${data.pointsEarned} pts`);
       }
@@ -49,6 +49,9 @@ export default function KingdomTree({ user }: { user: User }) {
         setWatering(false);
         setTimeout(() => setFeedback(null), 2000);
       }, 1000);
+    } catch (err) {
+      console.error("Error watering tree:", err);
+      setWatering(false);
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Trophy, UserPlus, Star, X, Shield } from 'lucide-react';
 import { Team, User } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getTeams, getTeamMembers, joinTeam } from '../services/api';
 
 export default function Teams({ user }: { user: User }) {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -11,23 +12,24 @@ export default function Teams({ user }: { user: User }) {
   const [loadingMembers, setLoadingMembers] = useState(false);
 
   useEffect(() => {
-    fetch('/api/teams')
-      .then(res => res.json())
+    getTeams()
       .then(data => {
         setTeams(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching teams:", err);
         setLoading(false);
       });
   }, []);
 
   const handleJoinTeam = async (e: React.MouseEvent, teamId: number) => {
     e.stopPropagation();
-    const res = await fetch('/api/teams/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, teamId }),
-    });
-    if (res.ok) {
+    try {
+      await joinTeam(user.id, teamId);
       window.location.reload();
+    } catch (err) {
+      console.error("Error joining team:", err);
     }
   };
 
@@ -35,8 +37,7 @@ export default function Teams({ user }: { user: User }) {
     setSelectedTeam(team);
     setLoadingMembers(true);
     try {
-      const res = await fetch(`/api/teams/${team.id}/members`);
-      const data = await res.json();
+      const data = await getTeamMembers(team.id);
       setTeamMembers(data);
     } catch (error) {
       console.error("Error fetching team members:", error);

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { User, Search, Edit2, Shield, Star, Mail, Plus, Trash2, X, Save, Upload, FileText } from 'lucide-react';
 import { User as UserType, Team } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getUsers, getTeams, updateUser, deleteUser, register } from '../services/api';
+import { supabase } from '../lib/supabase';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserType[]>([]);
@@ -28,16 +30,23 @@ export default function AdminUsers() {
   }, []);
 
   const fetchUsers = async () => {
-    const res = await fetch('/api/admin/users');
-    const data = await res.json();
-    setUsers(data);
-    setLoading(false);
+    try {
+      const data = await getUsers();
+      setUsers(data);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchTeams = async () => {
-    const res = await fetch('/api/teams');
-    const data = await res.json();
-    setTeams(data);
+    try {
+      const data = await getTeams();
+      setTeams(data);
+    } catch (err) {
+      console.error("Error fetching teams:", err);
+    }
   };
 
   const filteredUsers = users.filter(u => 
@@ -81,44 +90,37 @@ export default function AdminUsers() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingUser ? `/api/admin/users/${editingUser.id}` : '/api/admin/users';
-    const method = editingUser ? 'PUT' : 'POST';
-
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      const dataToSave = {
         ...formData,
         team_id: formData.team_id ? parseInt(formData.team_id) : null
-      }),
-    });
+      };
 
-    if (res.ok) {
+      if (editingUser) {
+        // Remove password if empty
+        if (!dataToSave.password) {
+          delete (dataToSave as any).password;
+        }
+        await updateUser(editingUser.id!, dataToSave as any);
+      } else {
+        await register(dataToSave.name, dataToSave.email, dataToSave.password);
+      }
+
       fetchUsers();
       handleCloseModal();
-    } else {
-      const data = await res.json();
-      alert(data.error || 'Erro ao salvar usuário');
+    } catch (err: any) {
+      alert(err.message || 'Erro ao salvar usuário');
     }
   };
 
   const handleDelete = async (id: number) => {
-    console.log('Attempting to delete user with ID:', id);
     if (!confirm('Tem certeza que deseja excluir este usuário? Todos os dados relacionados (tarefas, presença, etc) serão removidos.')) return;
 
     try {
-      const res = await fetch(`/api/admin/users/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        fetchUsers();
-      } else {
-        const error = await res.json();
-        alert('Erro ao excluir usuário: ' + (error.error || 'Erro desconhecido'));
-      }
-    } catch (err) {
-      alert('Erro de conexão ao tentar excluir usuário');
+      await deleteUser(id);
+      fetchUsers();
+    } catch (err: any) {
+      alert('Erro ao excluir usuário: ' + (err.message || 'Erro desconhecido'));
     }
   };
 
@@ -155,19 +157,13 @@ export default function AdminUsers() {
       }
 
       try {
-        const res = await fetch('/api/admin/users/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ users: usersToUpload }),
-        });
+        const { error } = await supabase.from('users').insert(usersToUpload);
 
-        if (res.ok) {
-          const result = await res.json();
-          alert(`${result.count} usuários cadastrados com sucesso!`);
+        if (!error) {
+          alert(`${usersToUpload.length} usuários cadastrados com sucesso!`);
           fetchUsers();
         } else {
-          const error = await res.json();
-          alert('Erro no upload: ' + error.error);
+          alert('Erro no upload: ' + error.message);
         }
       } catch (err) {
         alert('Erro ao processar arquivo.');

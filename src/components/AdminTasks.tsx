@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { UserTask, Task } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getPendingTasks, getTasks, verifyTask, createTask, updateTask, deleteTask } from '../services/api';
+import { supabase } from '../lib/supabase';
 
 export default function AdminTasks() {
   const [activeTab, setActiveTab] = useState<'validation' | 'manage'>('validation');
@@ -47,26 +49,30 @@ export default function AdminTasks() {
 
   const fetchData = async () => {
     setLoading(true);
-    if (activeTab === 'validation') {
-      const res = await fetch('/api/admin/pending-tasks');
-      const data = await res.json();
-      setPending(data);
-    } else {
-      const res = await fetch('/api/admin/tasks');
-      const data = await res.json();
-      setTasks(data);
+    try {
+      if (activeTab === 'validation') {
+        const data = await getPendingTasks();
+        setPending(data);
+      } else {
+        const data = await getTasks();
+        setTasks(data);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleVerify = async (userTaskId: number, status: 'verified' | 'rejected') => {
-    const res = await fetch('/api/admin/verify-task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userTaskId, status }),
-    });
-    if (res.ok) {
+    try {
+      const taskToVerify = pending.find(p => p.id === userTaskId);
+      if (!taskToVerify) return;
+      
+      await verifyTask(userTaskId, status, taskToVerify.user_id, taskToVerify.points);
       fetchData();
+    } catch (err) {
+      console.error("Error verifying task:", err);
     }
   };
 
@@ -119,40 +125,31 @@ export default function AdminTasks() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingTask ? `/api/admin/tasks/${editingTask.id}` : '/api/admin/tasks';
-    const method = editingTask ? 'PUT' : 'POST';
-
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const taskData = {
+        ...formData,
+        is_active: formData.is_active ? 1 : 0
+      };
 
-      if (res.ok) {
-        setIsModalOpen(false);
-        fetchData();
+      if (editingTask) {
+        await updateTask(editingTask.id, taskData as any);
       } else {
-        const error = await res.json();
-        alert('Erro ao salvar tarefa: ' + (error.error || 'Erro desconhecido'));
+        await createTask(taskData as any);
       }
-    } catch (err) {
-      alert('Erro de conexão ao tentar salvar tarefa');
+      setIsModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      alert('Erro ao salvar tarefa: ' + (err.message || 'Erro desconhecido'));
     }
   };
 
   const handleDeleteTask = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
     try {
-      const res = await fetch(`/api/admin/tasks/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchData();
-      } else {
-        const error = await res.json();
-        alert('Erro ao excluir tarefa: ' + (error.error || 'Erro desconhecido'));
-      }
-    } catch (err) {
-      alert('Erro de conexão ao tentar excluir tarefa');
+      await deleteTask(id);
+      fetchData();
+    } catch (err: any) {
+      alert('Erro ao excluir tarefa: ' + (err.message || 'Erro desconhecido'));
     }
   };
 
@@ -187,19 +184,13 @@ export default function AdminTasks() {
       }
 
       try {
-        const res = await fetch('/api/admin/tasks/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tasks: tasksToUpload }),
-        });
+        const { error } = await supabase.from('tasks').insert(tasksToUpload);
 
-        if (res.ok) {
-          const result = await res.json();
-          alert(`${result.count} tarefas cadastradas com sucesso!`);
+        if (!error) {
+          alert(`${tasksToUpload.length} tarefas cadastradas com sucesso!`);
           fetchData();
         } else {
-          const error = await res.json();
-          alert('Erro no upload: ' + error.error);
+          alert('Erro no upload: ' + error.message);
         }
       } catch (err) {
         alert('Erro ao processar arquivo.');

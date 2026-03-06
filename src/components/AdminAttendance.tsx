@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QrCode, Plus, Calendar, Star, Users, CheckCircle2, Trash2, Clock } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { getAttendanceSessions, createAttendanceSession, deleteAttendanceSession } from '../services/api';
 
 export default function AdminAttendance() {
   const [eventType, setEventType] = useState('Culto Domingo');
@@ -16,29 +17,34 @@ export default function AdminAttendance() {
 
   const fetchSessions = async () => {
     setLoading(true);
-    const res = await fetch('/api/admin/sessions');
-    const data = await res.json();
-    setSessions(data);
-    setLoading(false);
+    try {
+      const data = await getAttendanceSessions();
+      setSessions(data);
+    } catch (err) {
+      console.error("Error fetching sessions:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreateSession = async () => {
-    const res = await fetch('/api/admin/create-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventType, points, maxCheckins }),
-    });
-    const data = await res.json();
-    setCurrentSession(data);
-    fetchSessions();
+    try {
+      const data = await createAttendanceSession(eventType, points, maxCheckins);
+      setCurrentSession(data);
+      fetchSessions();
+    } catch (err) {
+      console.error("Error creating session:", err);
+    }
   };
 
   const handleDeleteSession = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir esta sessão? Todos os registros de presença vinculados serão removidos.')) return;
-    const res = await fetch(`/api/admin/sessions/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      await deleteAttendanceSession(id);
       if (currentSession?.id === id) setCurrentSession(null);
       fetchSessions();
+    } catch (err) {
+      console.error("Error deleting session:", err);
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit2, Trash2, Star, Palette, X, Save, Upload, Image as ImageIcon } from 'lucide-react';
 import { Team, User } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getTeams, getUsers, createTeam, updateTeam, deleteTeam } from '../services/api';
 
 export default function AdminTeams() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -24,16 +25,23 @@ export default function AdminTeams() {
   }, []);
 
   const fetchTeams = async () => {
-    const res = await fetch('/api/admin/teams');
-    const data = await res.json();
-    setTeams(data);
-    setLoading(false);
+    try {
+      const data = await getTeams();
+      setTeams(data);
+    } catch (err) {
+      console.error("Error fetching teams:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchUsers = async () => {
-    const res = await fetch('/api/users');
-    const data = await res.json();
-    setUsers(data);
+    try {
+      const data = await getUsers();
+      setUsers(data);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
   };
 
   const handleOpenModal = (team?: Team) => {
@@ -84,24 +92,22 @@ export default function AdminTeams() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingTeam ? `/api/admin/teams/${editingTeam.id}` : '/api/admin/teams';
-    const method = editingTeam ? 'PUT' : 'POST';
-
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      const teamData = {
         ...formData,
         leader_id: formData.leader_id ? parseInt(formData.leader_id) : null
-      }),
-    });
+      };
 
-    if (res.ok) {
+      if (editingTeam) {
+        await updateTeam(editingTeam.id, teamData as any);
+      } else {
+        await createTeam(teamData as any);
+      }
+
       fetchTeams();
       handleCloseModal();
-    } else {
-      const data = await res.json();
-      alert(data.error || 'Erro ao salvar equipe');
+    } catch (err: any) {
+      alert(err.message || 'Erro ao salvar equipe');
     }
   };
 
@@ -109,18 +115,10 @@ export default function AdminTeams() {
     if (!confirm('Tem certeza que deseja excluir esta equipe? Os membros ficarão sem equipe.')) return;
 
     try {
-      const res = await fetch(`/api/admin/teams/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        fetchTeams();
-      } else {
-        const error = await res.json();
-        alert('Erro ao excluir equipe: ' + (error.error || 'Erro desconhecido'));
-      }
-    } catch (err) {
-      alert('Erro de conexão ao tentar excluir equipe');
+      await deleteTeam(id);
+      fetchTeams();
+    } catch (err: any) {
+      alert('Erro ao excluir equipe: ' + (err.message || 'Erro desconhecido'));
     }
   };
 

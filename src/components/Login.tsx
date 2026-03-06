@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Star, Mail, Lock, ArrowRight, AlertCircle, User as UserIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../types';
+import { login, register } from '../services/api';
 
 export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,25 +17,16 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
     setLoading(true);
     setError('');
 
-    const endpoint = isLogin ? '/api/login' : '/api/register';
-    const body = isLogin ? { email, password } : { name, email, password };
-
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        onLogin(data);
+      let userData;
+      if (isLogin) {
+        userData = await login(email, password);
       } else {
-        setError(data.error || 'Erro ao processar solicitação.');
+        userData = await register(name, email, password);
       }
-    } catch (err) {
-      setError('Erro ao conectar com o servidor.');
+      onLogin(userData);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao processar solicitação.');
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { QrCode, Camera, CheckCircle2, AlertCircle, History, X } from 'lucide-react';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { User } from '../types';
+import { checkIn } from '../services/api';
 
 export default function Attendance({ user }: { user: User }) {
   const [scanning, setScanning] = useState(false);
@@ -45,20 +46,10 @@ export default function Attendance({ user }: { user: User }) {
     setScanning(false);
     
     try {
-      const res = await fetch('/api/attendance/checkin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, code }),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        setStatus({ type: 'success', message: `Presença confirmada! +${data.points} pontos.` });
-      } else {
-        setStatus({ type: 'error', message: data.error || 'Erro ao marcar presença.' });
-      }
-    } catch (err) {
-      setStatus({ type: 'error', message: 'Erro ao conectar com o servidor.' });
+      const data = await checkIn(user.id, code);
+      setStatus({ type: 'success', message: `Presença confirmada! +${data.points} pontos.` });
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message || 'Erro ao marcar presença.' });
     }
   };
 

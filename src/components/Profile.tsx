@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../types';
+import { updateUser } from '../services/api';
 
 export default function Profile({ user, onUpdateUser }: { user: User, onUpdateUser: (user: User) => void }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -42,17 +43,8 @@ export default function Profile({ user, onUpdateUser }: { user: User, onUpdateUs
     reader.onloadend = async () => {
       const base64 = reader.result as string;
       try {
-        const res = await fetch(`/api/users/${user.id}/avatar`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ avatar: base64 }),
-        });
-
-        if (res.ok) {
-          onUpdateUser({ ...user, avatar: base64 });
-        } else {
-          alert('Erro ao atualizar foto de perfil');
-        }
+        await updateUser(user.id, { avatar: base64 });
+        onUpdateUser({ ...user, avatar: base64 });
       } catch (err) {
         console.error('Error uploading avatar:', err);
         alert('Erro ao carregar imagem');

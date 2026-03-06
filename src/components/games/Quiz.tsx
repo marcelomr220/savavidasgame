@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Brain, CheckCircle2, XCircle, Star, ArrowRight, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BiblicalQuestion, User } from '../../types';
+import { getDailyQuiz, submitQuiz } from '../../services/api';
 
 export default function Quiz({ user }: { user: User }) {
   const [questions, setQuestions] = useState<BiblicalQuestion[]>([]);
@@ -13,10 +14,13 @@ export default function Quiz({ user }: { user: User }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/quiz/daily')
-      .then(res => res.json())
+    getDailyQuiz()
       .then(data => {
         setQuestions(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching quiz:", err);
         setLoading(false);
       });
   }, []);
@@ -40,17 +44,17 @@ export default function Quiz({ user }: { user: User }) {
         setIsCorrect(null);
       } else {
         setQuizFinished(true);
-        submitScore();
+        handleSubmitScore();
       }
     }, 1500);
   };
 
-  const submitScore = async () => {
-    await fetch('/api/quiz/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, score }),
-    });
+  const handleSubmitScore = async () => {
+    try {
+      await submitQuiz(user.id, score);
+    } catch (err) {
+      console.error("Error submitting quiz score:", err);
+    }
   };
 
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>;
