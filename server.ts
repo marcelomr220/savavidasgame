@@ -139,6 +139,31 @@ db.exec(`
   );
 `);
 
+// Helper for adding points to user and team
+async function addPoints(userId: any, amount: number) {
+  if (amount <= 0) return;
+  
+  try {
+    // Update SQLite
+    db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(amount, userId);
+    const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userId);
+    if (user && user.team_id) {
+      db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(amount, user.team_id);
+    }
+
+    // Update Supabase
+    if (supabase) {
+      await supabase.rpc('increment_user_points', { row_id: userId, amount });
+      const { data: userData } = await supabase.from('users').select('team_id').eq('id', userId).single();
+      if (userData?.team_id) {
+        await supabase.rpc('increment_team_points', { row_id: userData.team_id, amount });
+      }
+    }
+  } catch (err) {
+    console.error("Error adding points:", err);
+  }
+}
+
 // Seed initial data if empty
 const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
 if (userCount === 0) {
@@ -326,6 +351,59 @@ async function startServer() {
     try {
       const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
       res.json(tasks);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+      const activeTeams = db.prepare("SELECT COUNT(*) as count FROM teams").get().count;
+      const pendingTasks = db.prepare("SELECT COUNT(*) as count FROM user_tasks WHERE status = 'pending'").get().count;
+      
+      // Monthly attendance (last 30 days)
+      const monthlyAttendance = db.prepare(`
+        SELECT COUNT(*) as count 
+        FROM attendances 
+        WHERE created_at >= date('now', '-30 days')
+      `).get().count;
+
+      res.json({
+        totalUsers,
+        activeTeams,
+        pendingTasks,
+        monthlyAttendance
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/admin/recent-activities", async (req, res) => {
+    try {
+      // Combine recent user registrations and task completions
+      const recentUsers = db.prepare(`
+        SELECT 'user_registered' as type, name as title, created_at as date, id
+        FROM users 
+        ORDER BY created_at DESC 
+        LIMIT 5
+      `).all();
+
+      const recentTasks = db.prepare(`
+        SELECT 'task_completed' as type, u.name || ' completou ' || t.title as title, ut.completed_at as date, ut.id
+        FROM user_tasks ut
+        JOIN users u ON ut.user_id = u.id
+        JOIN tasks t ON ut.task_id = t.id
+        ORDER BY ut.completed_at DESC 
+        LIMIT 5
+      `).all();
+
+      const combined = [...recentUsers, ...recentTasks]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5);
+
+      res.json(combined);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -897,38 +975,30 @@ async function startServer() {
       // Always update SQLite
       db.prepare("UPDATE user_tasks SET status = ?, verified_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, userTaskId);
 
-      let points = 0;
       if (status === 'verified') {
         const task = db.prepare("SELECT points FROM tasks WHERE id = ?").get(userTask.task_id);
-        points = task.points;
-        db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(points, userTask.user_id);
+        await addPoints(userTask.user_id, task.points);
         
-        const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userTask.user_id);
-        if (user && user.team_id) {
-          db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(points, user.team_id);
+        // Update Supabase status specifically for user_tasks
+        if (supabase) {
+          try {
+            await supabase
+              .from('user_tasks')
+              .update({ status, verified_at: new Date().toISOString() })
+              .eq('id', userTaskId);
+          } catch (supaErr) {
+            console.error("Supabase task status update error:", supaErr);
+          }
         }
-      }
-
-      // Attempt Supabase update
-      if (supabase) {
+      } else if (supabase) {
+        // Just update status to rejected in Supabase
         try {
-          const { error: updateError } = await supabase
+          await supabase
             .from('user_tasks')
             .update({ status, verified_at: new Date().toISOString() })
             .eq('id', userTaskId);
-
-          if (!updateError && status === 'verified') {
-            // Update user points in Supabase
-            await supabase.rpc('increment_user_points', { row_id: userTask.user_id, amount: points });
-            
-            // Update team points if user has team
-            const { data: userWithTeam } = await supabase.from('users').select('team_id').eq('id', userTask.user_id).single();
-            if (userWithTeam?.team_id) {
-              await supabase.rpc('increment_team_points', { row_id: userWithTeam.team_id, amount: points });
-            }
-          }
-        } catch (supaErr: any) {
-          console.error("Supabase connection error during task verification:", supaErr.message);
+        } catch (supaErr) {
+          console.error("Supabase task status update error:", supaErr);
         }
       }
 
@@ -1097,23 +1167,22 @@ async function startServer() {
     const { userId, score } = req.body;
     const today = new Date().toISOString().split('T')[0];
     
-    if (supabase) {
-      const { error } = await supabase
-        .from('daily_quizzes')
-        .insert([{ user_id: userId, date: today, score }]);
+    try {
+      // Record quiz attempt
+      db.prepare("INSERT INTO daily_quizzes (user_id, date, score) VALUES (?, ?, ?)").run(userId, today, score);
       
-      if (!error) {
-        await supabase.rpc('increment_user_points', { row_id: userId, amount: score });
-        // Sync to SQLite
-        db.prepare("INSERT INTO daily_quizzes (user_id, date, score) VALUES (?, ?, ?)").run(userId, today, score);
-        db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(score, userId);
-        return res.json({ success: true });
+      if (supabase) {
+        await supabase.from('daily_quizzes').insert([{ user_id: userId, date: today, score }]);
       }
-    }
 
-    db.prepare("INSERT INTO daily_quizzes (user_id, date, score) VALUES (?, ?, ?)").run(userId, today, score);
-    db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(score, userId);
-    res.json({ success: true });
+      // Award points
+      await addPoints(userId, score);
+      
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Quiz submit error:", err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Games - Tree
@@ -1203,7 +1272,7 @@ async function startServer() {
           // Sync to SQLite
           db.prepare("UPDATE user_trees SET water_count = ?, stage = ?, last_watered_at = CURRENT_TIMESTAMP WHERE id = ?").run(newWaterCount, newStage, treeId);
           if (pointsEarned > 0) {
-            db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(pointsEarned, userId);
+            await addPoints(userId, pointsEarned);
           }
           return res.json({ success: true, stage: newStage, pointsEarned });
         }
@@ -1220,7 +1289,7 @@ async function startServer() {
     if (newWaterCount % 5 === 0 && tree.stage < tree.max_stages) {
       newStage += 1;
       pointsEarned = tree.points_per_stage;
-      db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(pointsEarned, userId);
+      await addPoints(userId, pointsEarned);
     }
 
     db.prepare("UPDATE user_trees SET water_count = ?, stage = ?, last_watered_at = CURRENT_TIMESTAMP WHERE id = ?").run(newWaterCount, newStage, treeId);

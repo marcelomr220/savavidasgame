@@ -20,6 +20,7 @@ export default function AdminDashboard() {
     pendingTasks: 0,
     monthlyAttendance: 0,
   });
+  const [activities, setActivities] = useState<any[]>([]);
   const [supabaseStatus, setSupabaseStatus] = useState<{configured: boolean, url: string | null}>({ configured: false, url: null });
 
   useEffect(() => {
@@ -27,10 +28,28 @@ export default function AdminDashboard() {
       .then(res => res.json())
       .then(data => setSupabaseStatus(data));
     
-    // Fetch real stats
-    fetch('/api/admin/users').then(res => res.json()).then(data => setStats(prev => ({ ...prev, totalUsers: data.length })));
-    fetch('/api/admin/teams').then(res => res.json()).then(data => setStats(prev => ({ ...prev, activeTeams: data.length })));
+    fetch('/api/admin/stats')
+      .then(res => res.json())
+      .then(data => setStats(data))
+      .catch(err => console.error("Error fetching stats:", err));
+
+    fetch('/api/admin/recent-activities')
+      .then(res => res.json())
+      .then(data => setActivities(data))
+      .catch(err => console.error("Error fetching activities:", err));
   }, []);
+
+  const formatRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Agora';
+    if (diffInMinutes < 60) return `Há ${diffInMinutes} min`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `Há ${diffInHours} h`;
+    return date.toLocaleDateString();
+  };
 
   return (
     <div className="space-y-8">
@@ -70,20 +89,25 @@ export default function AdminDashboard() {
         <section className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
           <h3 className="font-bold text-stone-900 mb-4">Atividades Recentes</h3>
           <div className="divide-y divide-stone-50">
-            {[1, 2, 3, 4].map((i) => (
+            {activities.map((activity, i) => (
               <div key={i} className="py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-stone-100 overflow-hidden">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`} alt="User" />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                    activity.type === 'user_registered' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'
+                  }`}>
+                    {activity.type === 'user_registered' ? <UserCheck size={14} /> : <CheckSquare size={14} />}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-stone-900">Novo usuário registrado</p>
-                    <p className="text-xs text-stone-500">Há {i * 10} minutos</p>
+                    <p className="text-sm font-semibold text-stone-900">{activity.title}</p>
+                    <p className="text-xs text-stone-500">{formatRelativeTime(activity.date)}</p>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-stone-300" />
               </div>
             ))}
+            {activities.length === 0 && (
+              <p className="text-sm text-stone-400 italic py-4">Nenhuma atividade recente encontrada.</p>
+            )}
           </div>
         </section>
       </div>

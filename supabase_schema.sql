@@ -120,3 +120,22 @@ CREATE TABLE app_settings (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+
+-- Functions for atomic point increments
+CREATE OR REPLACE FUNCTION increment_user_points(row_id BIGINT, amount INT)
+RETURNS void AS $$
+BEGIN
+  UPDATE users
+  SET points = points + amount
+  WHERE id = row_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION increment_team_points(row_id BIGINT, amount INT)
+RETURNS void AS $$
+BEGIN
+  UPDATE teams
+  SET total_points = total_points + amount
+  WHERE id = row_id;
+END;
+$$ LANGUAGE plpgsql;
