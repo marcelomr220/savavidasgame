@@ -14,9 +14,11 @@ const CHARACTERS = [
   { id: 8, name: 'Paulo', icon: '✉️' },
 ];
 
+import { useNavigate } from 'react-router-dom';
 import { submitQuiz } from '../../services/api';
 
 export default function MemoryGame({ user }: { user: User }) {
+  const navigate = useNavigate();
   const [cards, setCards] = useState<any[]>([]);
   const [flipped, setFlipped] = useState<number[]>([]);
   const [solved, setSolved] = useState<number[]>([]);
@@ -157,7 +159,7 @@ export default function MemoryGame({ user }: { user: User }) {
                 Jogar Novamente
               </button>
               <button 
-                onClick={() => window.location.href = '/games'}
+                onClick={() => navigate('/games')}
                 className="flex-1 py-3 bg-red-700 text-white rounded-xl font-bold hover:bg-red-800 transition-colors"
               >
                 Sair

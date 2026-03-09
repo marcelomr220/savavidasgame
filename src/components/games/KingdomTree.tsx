@@ -39,9 +39,9 @@ export default function KingdomTree({ user }: { user: User }) {
     setWatering(true);
     
     try {
-      const data = await waterTree(user.id, tree.id);
+      const data = await waterTree(tree.id, user.id);
       
-      if (data.pointsEarned > 0) {
+      if (data && data.pointsEarned > 0) {
         setFeedback(`Evoluiu! +${data.pointsEarned} pts`);
       }
       setTimeout(() => {
@@ -86,7 +86,7 @@ export default function KingdomTree({ user }: { user: User }) {
     );
   }
 
-  const progress = (tree.water_count % 5) * 20;
+  const progress = ((tree.water_count || 0) % 5) * 20;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">

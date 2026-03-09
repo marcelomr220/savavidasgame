@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Brain, CheckCircle2, XCircle, Star, ArrowRight, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BiblicalQuestion, User } from '../../types';
+import { useNavigate } from 'react-router-dom';
 import { getDailyQuiz, submitQuiz } from '../../services/api';
 
 export default function Quiz({ user }: { user: User }) {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState<BiblicalQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -16,7 +18,9 @@ export default function Quiz({ user }: { user: User }) {
   useEffect(() => {
     getDailyQuiz()
       .then(data => {
-        setQuestions(data);
+        if (data && data.length > 0) {
+          setQuestions(data);
+        }
         setLoading(false);
       })
       .catch(err => {
@@ -26,7 +30,7 @@ export default function Quiz({ user }: { user: User }) {
   }, []);
 
   const handleAnswer = (option: string) => {
-    if (selectedOption) return;
+    if (selectedOption || !questions[currentIndex]) return;
     
     setSelectedOption(option);
     const correct = option === questions[currentIndex].correct_option;
@@ -59,6 +63,22 @@ export default function Quiz({ user }: { user: User }) {
 
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>;
 
+  if (questions.length === 0) {
+    return (
+      <div className="text-center p-12 bg-white rounded-3xl border border-stone-200">
+        <Brain className="mx-auto text-stone-300 mb-4" size={48} />
+        <h3 className="text-xl font-bold text-stone-900 mb-2">Sem perguntas hoje</h3>
+        <p className="text-stone-500 mb-6">Volte mais tarde para um novo desafio!</p>
+        <button 
+          onClick={() => navigate('/games')}
+          className="px-6 py-3 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition-colors"
+        >
+          Voltar para Games
+        </button>
+      </div>
+    );
+  }
+
   if (quizFinished) {
     return (
       <motion.div 
@@ -78,7 +98,7 @@ export default function Quiz({ user }: { user: User }) {
         </div>
 
         <button 
-          onClick={() => window.location.href = '/games'}
+          onClick={() => navigate('/games')}
           className="w-full py-4 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition-colors"
         >
           Voltar para Games

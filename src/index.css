@@ -13,22 +13,22 @@
   --radius-xl: 24px;
   --radius-2xl: 32px;
   
-  --color-primary: #6750A4;
+  --color-primary: #DC2626;
   --color-on-primary: #FFFFFF;
-  --color-primary-container: #EADDFF;
-  --color-on-primary-container: #21005D;
+  --color-primary-container: #FEE2E2;
+  --color-on-primary-container: #450A0A;
   
-  --color-secondary: #625B71;
+  --color-secondary: #7F1D1D;
   --color-on-secondary: #FFFFFF;
-  --color-secondary-container: #E8DEF8;
-  --color-on-secondary-container: #1D192B;
+  --color-secondary-container: #FFE4E6;
+  --color-on-secondary-container: #4C0519;
   
-  --color-surface: #FEF7FF;
-  --color-on-surface: #1D1B20;
-  --color-surface-variant: #E7E0EB;
-  --color-on-surface-variant: #49454F;
+  --color-surface: #FFFFFF;
+  --color-on-surface: #111827;
+  --color-surface-variant: #F3F4F6;
+  --color-on-surface-variant: #4B5563;
   
-  --color-outline: #79747E;
+  --color-outline: #9CA3AF;
 }
 
 @layer base {

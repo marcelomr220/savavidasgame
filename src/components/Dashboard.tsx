@@ -45,20 +45,38 @@ export default function Dashboard({ user }: { user: User }) {
           <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
             <motion.div
               animate={{ 
-                scale: [1 + (progress/100) * 0.3, (1 + (progress/100) * 0.3) * 1.1, 1 + (progress/100) * 0.3],
-                rotate: [-2, 2, -2]
+                scale: [1, 1.1, 1],
+                rotate: [-5, 5, -5]
               }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               className="relative z-10"
             >
-              <div className="absolute inset-0 bg-orange-500/20 rounded-full blur-xl animate-pulse" />
-              <Flame size={64} className="text-orange-500 drop-shadow-lg" fill="currentColor" />
+              <div className="absolute inset-0 bg-red-500/20 rounded-full blur-xl animate-pulse" />
+              <div className="relative">
+                <Flame size={64} className="text-red-600 drop-shadow-lg" fill="currentColor" />
+                {/* Face */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
+                  <div className="flex gap-2">
+                    <motion.div 
+                      animate={{ scaleY: [1, 0.1, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                      className="w-1.5 h-1.5 bg-white rounded-full" 
+                    />
+                    <motion.div 
+                      animate={{ scaleY: [1, 0.1, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                      className="w-1.5 h-1.5 bg-white rounded-full" 
+                    />
+                  </div>
+                  <div className="w-3 h-1.5 border-b-2 border-white rounded-full mt-1" />
+                </div>
+              </div>
               <motion.div
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1, repeat: Infinity }}
-                className="absolute inset-0 flex items-center justify-center"
+                animate={{ opacity: [0.5, 1, 0.5], scale: [0.8, 1, 0.8] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
               >
-                <Flame size={32} className="text-yellow-400" fill="currentColor" />
+                <Flame size={32} className="text-orange-400" fill="currentColor" />
               </motion.div>
             </motion.div>
           </div>

@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Sword, Star, Trophy, ArrowRight, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../../types';
+import { useNavigate } from 'react-router-dom';
 import { submitQuiz } from '../../services/api';
 
 export default function PastorAdventure({ user }: { user: User }) {
+  const navigate = useNavigate();
   const [finished, setFinished] = useState(false);
 
   const handleFinish = async () => {
@@ -77,7 +79,7 @@ export default function PastorAdventure({ user }: { user: User }) {
             </div>
 
             <button 
-              onClick={() => window.location.href = '/games'}
+              onClick={() => navigate('/games')}
               className="w-full py-4 bg-white text-stone-900 rounded-2xl font-bold hover:bg-stone-100 transition-colors"
             >
               Voltar para o Mapa

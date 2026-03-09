@@ -53,15 +53,6 @@ export default function Games({ user }: { user: User }) {
       path: '/games/memory'
     },
     { 
-      id: 'puzzle', 
-      title: 'Quebra-Cabeça', 
-      desc: 'Monte cenas bíblicas e aprenda versículos.', 
-      icon: Puzzle, 
-      color: 'bg-orange-500', 
-      points: '25 pts',
-      path: '/games/puzzle'
-    },
-    { 
       id: 'adventure', 
       title: 'Aventura do Pastor', 
       desc: 'Ajude o pastor em sua missão evangelística.', 
@@ -83,7 +74,6 @@ export default function Games({ user }: { user: User }) {
           <Route path="quiz" element={<Quiz user={user} />} />
           <Route path="tree" element={<KingdomTree user={user} />} />
           <Route path="memory" element={<MemoryGame user={user} />} />
-          <Route path="puzzle" element={<PuzzleGame user={user} />} />
           <Route path="adventure" element={<PastorAdventure user={user} />} />
         </Routes>
       </div>

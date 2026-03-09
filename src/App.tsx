@@ -35,6 +35,8 @@ import AdminTeams from './components/AdminTeams';
 import AdminUsers from './components/AdminUsers';
 import Login from './components/Login';
 
+import BottomNavigation from './components/BottomNavigation';
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -88,7 +90,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-surface">
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-surface sticky top-0 z-50">
+      <div className="md:hidden flex items-center justify-between p-4 bg-surface sticky top-0 z-50 border-b border-stone-100">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-sm">
             <Star size={24} fill="currentColor" />
@@ -101,8 +103,8 @@ export default function App() {
               <Settings size={22} />
             </Link>
           )}
-          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors">
-            {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          <button onClick={handleLogout} className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors">
+            <LogOut size={22} />
           </button>
         </div>
       </div>
@@ -219,37 +221,7 @@ export default function App() {
       </main>
 
       {/* Bottom Navigation (Mobile) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-surface-variant px-2 py-1 safe-area-bottom z-50 flex justify-around items-center h-16 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-        {navItems.slice(0, 5).map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`flex flex-col items-center justify-center flex-1 py-1 px-2 rounded-2xl transition-all duration-200 ${
-              location.pathname === item.path
-                ? 'text-primary'
-                : 'text-on-surface-variant'
-            }`}
-          >
-            <div className={`p-1.5 rounded-full transition-colors ${location.pathname === item.path ? 'bg-primary-container' : ''}`}>
-              <item.icon size={22} />
-            </div>
-            <span className="text-[10px] font-medium mt-1">{item.label}</span>
-          </Link>
-        ))}
-        <Link
-          to="/profile"
-          className={`flex flex-col items-center justify-center flex-1 py-1 px-2 rounded-2xl transition-all duration-200 ${
-            location.pathname === '/profile'
-              ? 'text-primary'
-              : 'text-on-surface-variant'
-          }`}
-        >
-          <div className={`p-1.5 rounded-full transition-colors ${location.pathname === '/profile' ? 'bg-primary-container' : ''}`}>
-            <UserIcon size={22} />
-          </div>
-          <span className="text-[10px] font-medium mt-1">Perfil</span>
-        </Link>
-      </nav>
+      <BottomNavigation />
     </div>
   );
 }
