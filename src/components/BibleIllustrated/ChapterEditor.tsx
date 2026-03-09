@@ -28,6 +28,7 @@ export default function ChapterEditor() {
   const [books, setBooks] = useState<any[]>([]);
   const [bookId, setBookId] = useState<number>(0);
   const [chapterNumber, setChapterNumber] = useState<number>(1);
+  const [title, setTitle] = useState<string>('');
   const [blocks, setBlocks] = useState<ContentBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,6 +45,7 @@ export default function ChapterEditor() {
           const chapter = await getChapter(Number(id));
           setBookId(chapter.book_id);
           setChapterNumber(chapter.chapter_number);
+          setTitle(chapter.title || '');
           setBlocks(chapter.content.map((b: any, i: number) => ({ ...b, id: `block-${i}` })));
         }
       } catch (err) {
@@ -74,6 +76,7 @@ export default function ChapterEditor() {
       const data = {
         book_id: bookId,
         chapter_number: chapterNumber,
+        title,
         content: blocks.map(({ type, value }) => ({ type, value }))
       };
 
@@ -177,6 +180,16 @@ export default function ChapterEditor() {
                 type="number"
                 value={chapterNumber}
                 onChange={(e) => setChapterNumber(Number(e.target.value))}
+                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-red-500/20"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-400 uppercase mb-2">Título do Capítulo (Opcional)</label>
+              <input 
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: A Criação do Mundo"
                 className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-red-500/20"
               />
             </div>

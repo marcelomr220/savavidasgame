@@ -25,8 +25,9 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SU
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 // Initialize Database
-if (db) {
-  db.exec(`
+try {
+  if (db) {
+    db.exec(`
     CREATE TABLE IF NOT EXISTS teams (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -155,7 +156,8 @@ if (db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       book_id INTEGER,
       chapter_number INTEGER,
-      content TEXT, -- JSON array of {type: 'text'|'image', value: string}
+      title TEXT,
+      content TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (book_id) REFERENCES bible_books (id)
     );
@@ -170,6 +172,17 @@ if (db) {
       FOREIGN KEY (chapter_id) REFERENCES bible_chapters (id)
     );
   `);
+
+  // Ensure title column exists for existing tables
+  try {
+    if (db) {
+      db.prepare("ALTER TABLE bible_chapters ADD COLUMN title TEXT").run();
+    }
+  } catch (e) {
+    // Column already exists or table doesn't exist yet
+  }
+} catch (err) {
+  console.error("Database initialization error:", err);
 }
 
 // Helper for adding points to user and team
@@ -1456,10 +1469,10 @@ async function startServer(app: any) {
     const { bookId } = req.params;
     try {
       if (supabase) {
-        const { data, error } = await supabase.from('bible_chapters').select('id, chapter_number').eq('book_id', bookId).order('chapter_number');
+        const { data, error } = await supabase.from('bible_chapters').select('id, chapter_number, title').eq('book_id', bookId).order('chapter_number');
         if (!error) return res.json(data);
       }
-      const chapters = db.prepare("SELECT id, chapter_number FROM bible_chapters WHERE book_id = ? ORDER BY chapter_number").all(bookId);
+      const chapters = db.prepare("SELECT id, chapter_number, title FROM bible_chapters WHERE book_id = ? ORDER BY chapter_number").all(bookId);
       res.json(chapters);
     } catch (err) {
       res.status(500).json({ error: "Error fetching chapters" });
@@ -1533,11 +1546,11 @@ async function startServer(app: any) {
   });
 
   app.post("/api/admin/bible/chapters", async (req, res) => {
-    const { book_id, chapter_number, content } = req.body;
+    const { book_id, chapter_number, title, content } = req.body;
     try {
-      const result = db.prepare("INSERT INTO bible_chapters (book_id, chapter_number, content) VALUES (?, ?, ?)").run(book_id, chapter_number, JSON.stringify(content));
+      const result = db.prepare("INSERT INTO bible_chapters (book_id, chapter_number, title, content) VALUES (?, ?, ?, ?)").run(book_id, chapter_number, title, JSON.stringify(content));
       if (supabase) {
-        await supabase.from('bible_chapters').insert([{ id: result.lastInsertRowid, book_id, chapter_number, content: JSON.stringify(content) }]);
+        await supabase.from('bible_chapters').insert([{ id: result.lastInsertRowid, book_id, chapter_number, title, content: JSON.stringify(content) }]);
       }
       res.json({ id: result.lastInsertRowid });
     } catch (err) {
@@ -1547,11 +1560,11 @@ async function startServer(app: any) {
 
   app.put("/api/admin/bible/chapters/:id", async (req, res) => {
     const { id } = req.params;
-    const { book_id, chapter_number, content } = req.body;
+    const { book_id, chapter_number, title, content } = req.body;
     try {
-      db.prepare("UPDATE bible_chapters SET book_id = ?, chapter_number = ?, content = ? WHERE id = ?").run(book_id, chapter_number, JSON.stringify(content), id);
+      db.prepare("UPDATE bible_chapters SET book_id = ?, chapter_number = ?, title = ?, content = ? WHERE id = ?").run(book_id, chapter_number, title, JSON.stringify(content), id);
       if (supabase) {
-        await supabase.from('bible_chapters').update({ book_id, chapter_number, content: JSON.stringify(content) }).eq('id', id);
+        await supabase.from('bible_chapters').update({ book_id, chapter_number, title, content: JSON.stringify(content) }).eq('id', id);
       }
       res.json({ success: true });
     } catch (err) {
@@ -1587,11 +1600,9 @@ async function startServer(app: any) {
   }
 
   const PORT = 3000;
-  if (process.env.NODE_ENV !== "production") {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
 
 export const app = express();

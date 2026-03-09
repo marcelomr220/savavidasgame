@@ -83,6 +83,19 @@ export default function ReadingView({ user }: { user: User }) {
 
       {/* Content */}
       <div className="max-w-3xl mx-auto pt-32 pb-40 px-6 space-y-32">
+        {chapter.title && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-4"
+          >
+            <h1 className="text-4xl md:text-6xl font-serif font-bold text-white leading-tight">
+              {chapter.title}
+            </h1>
+            <div className="w-24 h-1 bg-[#D4AF37] mx-auto rounded-full" />
+          </motion.div>
+        )}
+
         {chapter.content.map((item: any, index: number) => (
           <motion.div
             key={index}
