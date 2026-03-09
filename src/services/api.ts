@@ -544,20 +544,25 @@ export async function waterTree(treeId: number, userId: number) {
 
 // --- APP SETTINGS ---
 export async function getAppSettings(key: string) {
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', key)
-    .single();
-  
-  if (error) return null;
-  return data?.value;
+  try {
+    const response = await fetch(`/api/settings/${key}`);
+    const data = await response.json();
+    return data.value;
+  } catch (err) {
+    console.error("Error fetching settings:", err);
+    return null;
+  }
 }
 
 export async function updateAppSettings(key: string, value: string) {
-  const { error } = await supabase
-    .from('app_settings')
-    .upsert({ key, value });
+  const response = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value })
+  });
   
-  if (error) throw error;
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Erro ao salvar configurações');
+  }
 }

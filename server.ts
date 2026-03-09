@@ -1306,6 +1306,103 @@ async function startServer(app: any) {
     res.json({ success: true, stage: newStage, pointsEarned });
   });
 
+  // --- App Settings & Manifest ---
+  app.get("/api/settings/:key", async (req, res) => {
+    const { key } = req.params;
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', key)
+          .single();
+        if (!error && data) return res.json({ value: data.value });
+      }
+      
+      if (db) {
+        const setting = db.prepare("SELECT value FROM app_settings WHERE key = ?").get(key);
+        return res.json({ value: setting?.value || null });
+      }
+      res.json({ value: null });
+    } catch (err) {
+      res.status(500).json({ error: "Error fetching settings" });
+    }
+  });
+
+  app.post("/api/settings", async (req, res) => {
+    const { key, value } = req.body;
+    try {
+      if (db) {
+        db.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)").run(key, value);
+      }
+      if (supabase) {
+        await supabase.from('app_settings').upsert({ key, value });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error saving settings" });
+    }
+  });
+
+  app.get("/manifest.json", async (req, res) => {
+    let logoUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=SalvaVidas&backgroundColor=b6e3f4";
+    
+    try {
+      if (supabase) {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'login_logo').single();
+        if (data?.value) logoUrl = data.value;
+      } else if (db) {
+        const setting = db.prepare("SELECT value FROM app_settings WHERE key = 'login_logo'").get();
+        if (setting?.value) logoUrl = setting.value;
+      }
+    } catch (e) {
+      console.error("Error fetching logo for manifest:", e);
+    }
+
+    const manifest = {
+      short_name: "Salva Vidas",
+      name: "Salva Vidas Game",
+      icons: [
+        {
+          src: logoUrl,
+          type: logoUrl.includes('.svg') ? "image/svg+xml" : (logoUrl.includes('.png') ? "image/png" : "image/jpeg"),
+          sizes: "512x512",
+          purpose: "any maskable"
+        }
+      ],
+      start_url: ".",
+      display: "standalone",
+      theme_color: "#dc2626",
+      background_color: "#f8fafc"
+    };
+
+    res.json(manifest);
+  });
+
+  app.get("/api/app-logo", async (req, res) => {
+    let logoUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=SalvaVidas&backgroundColor=b6e3f4";
+    try {
+      if (supabase) {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'login_logo').single();
+        if (data?.value) logoUrl = data.value;
+      } else if (db) {
+        const setting = db.prepare("SELECT value FROM app_settings WHERE key = 'login_logo'").get();
+        if (setting?.value) logoUrl = setting.value;
+      }
+    } catch (e) {}
+
+    if (logoUrl.startsWith('data:')) {
+      const matches = logoUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const type = matches[1];
+        const data = Buffer.from(matches[2], 'base64');
+        res.setHeader('Content-Type', type);
+        return res.send(data);
+      }
+    }
+    res.redirect(logoUrl);
+  });
+
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
