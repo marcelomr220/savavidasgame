@@ -440,10 +440,35 @@ export async function submitQuiz(userId: number, score: number) {
 }
 
 // --- TREES ---
+export async function seedTreeTypes() {
+  const types = [
+    { id: 1, name: 'Oliveira da Paz', rarity: 'Comum', max_stages: 5, points_per_stage: 5 },
+    { id: 2, name: 'Cedro do Líbano', rarity: 'Rara', max_stages: 5, points_per_stage: 10 }
+  ];
+  
+  try {
+    const { data: existing, error: fetchError } = await supabase.from('tree_types').select('id');
+    if (fetchError) {
+      console.error("Error checking tree_types table. It might not exist.", fetchError);
+      return;
+    }
+    if (!existing || existing.length === 0) {
+      const { error: insertError } = await supabase.from('tree_types').upsert(types);
+      if (insertError) console.error("Error seeding tree_types:", insertError);
+    }
+  } catch (err) {
+    console.error("Critical error in seedTreeTypes:", err);
+  }
+}
+
 export async function getTreeTypes() {
+  await seedTreeTypes();
   const { data, error } = await supabase.from('tree_types').select('*');
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error("Error fetching tree types:", error);
+    return [];
+  }
+  return data || [];
 }
 
 export async function getUserTrees(userId: number): Promise<UserTree[]> {

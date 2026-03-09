@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QrCode, Plus, Calendar, Star, Users, CheckCircle2, Trash2, Clock } from 'lucide-react';
-import QRCode from 'react-qr-code';
+import { QRCodeSVG } from 'qrcode.react';
 import { getAttendanceSessions, createAttendanceSession, deleteAttendanceSession } from '../services/api';
 
 export default function AdminAttendance() {
@@ -29,11 +29,14 @@ export default function AdminAttendance() {
 
   const handleCreateSession = async () => {
     try {
+      console.log("Creating session with:", { eventType, points, maxCheckins });
       const data = await createAttendanceSession(eventType, points, maxCheckins);
+      console.log("Session created successfully:", data);
       setCurrentSession(data);
       fetchSessions();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating session:", err);
+      alert(`Erro ao gerar código QR: ${err.message || 'Erro desconhecido'}. Verifique se a tabela attendance_sessions existe no Supabase.`);
     }
   };
 
@@ -113,7 +116,7 @@ export default function AdminAttendance() {
           {currentSession ? (
             <div className="space-y-6">
               <div className="p-4 bg-white border-4 border-stone-900 rounded-3xl shadow-xl">
-                <QRCode value={currentSession.code} size={200} />
+                <QRCodeSVG value={currentSession.code} size={200} />
               </div>
               <div>
                 <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-1">Código Manual</p>

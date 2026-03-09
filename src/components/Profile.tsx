@@ -10,14 +10,18 @@ import {
   Shield,
   Mail,
   Users,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Smile
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { User } from '../types';
 import { updateUser } from '../services/api';
+import AvatarCreator from './AvatarCreator';
 
 export default function Profile({ user, onUpdateUser }: { user: User, onUpdateUser: (user: User) => void }) {
   const [isUploading, setIsUploading] = useState(false);
+  const [showAvatarCreator, setShowAvatarCreator] = useState(false);
   const [stats, setStats] = useState({
     totalTasks: 24,
     totalAttendance: 12,
@@ -85,8 +89,16 @@ export default function Profile({ user, onUpdateUser }: { user: User, onUpdateUs
                     </div>
                   )}
                 </div>
+                
+                <button 
+                  onClick={() => setShowAvatarCreator(true)}
+                  className="absolute -bottom-2 -right-2 p-2 bg-red-600 text-white rounded-full border-2 border-white shadow-lg hover:bg-red-700 transition-all z-10"
+                  title="Criar Avatar"
+                >
+                  <Smile size={16} />
+                </button>
               </div>
-              <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-red-600 border-4 border-white flex items-center justify-center text-white text-xs font-bold">
+              <div className="absolute -bottom-2 -left-2 w-8 h-8 rounded-full bg-red-600 border-4 border-white flex items-center justify-center text-white text-xs font-bold">
                 {user.level}
               </div>
             </div>
@@ -181,6 +193,25 @@ export default function Profile({ user, onUpdateUser }: { user: User, onUpdateUs
           ))}
         </div>
       </section>
+
+      <AnimatePresence>
+        {showAvatarCreator && (
+          <AvatarCreator 
+            initialAvatar={user.avatar}
+            onCancel={() => setShowAvatarCreator(false)}
+            onSave={async (url) => {
+              try {
+                await updateUser(user.id, { avatar: url });
+                onUpdateUser({ ...user, avatar: url });
+                setShowAvatarCreator(false);
+              } catch (err) {
+                console.error("Error saving avatar:", err);
+                alert("Erro ao salvar avatar.");
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

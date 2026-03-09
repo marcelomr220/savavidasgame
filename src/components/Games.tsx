@@ -4,7 +4,6 @@ import {
   Gamepad2, 
   Brain, 
   Layout, 
-  Puzzle, 
   Sword, 
   TreeDeciduous,
   ChevronRight,
@@ -16,7 +15,6 @@ import { User } from '../types';
 // Game Components
 import Quiz from './games/Quiz';
 import MemoryGame from './games/MemoryGame';
-import PuzzleGame from './games/PuzzleGame';
 import PastorAdventure from './games/PastorAdventure';
 import KingdomTree from './games/KingdomTree';
 

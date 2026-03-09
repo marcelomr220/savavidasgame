@@ -1,17 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { TreeDeciduous, Droplets, Star, Flame, Sparkles, Info } from 'lucide-react';
+import { TreeDeciduous, Droplets, Star, Flame, Sparkles, Info, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, UserTree } from '../../types';
-import { getUserTrees, plantTree, waterTree } from '../../services/api';
+import { getUserTrees, plantTree, waterTree, getTreeTypes } from '../../services/api';
 
 export default function KingdomTree({ user }: { user: User }) {
   const [tree, setTree] = useState<UserTree | null>(null);
+  const [treeTypes, setTreeTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [watering, setWatering] = useState(false);
+  const [planting, setPlanting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchTree();
+    const init = async () => {
+      try {
+        const types = await getTreeTypes(); // Ensure types exist and get them
+        setTreeTypes(types);
+        await fetchTree();
+      } catch (err) {
+        console.error("Error initializing Kingdom Tree:", err);
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const fetchTree = async () => {
@@ -26,11 +38,16 @@ export default function KingdomTree({ user }: { user: User }) {
   };
 
   const handlePlant = async (treeTypeId: number) => {
+    if (planting) return;
+    setPlanting(true);
     try {
       await plantTree(user.id, treeTypeId);
-      fetchTree();
+      await fetchTree();
     } catch (err) {
       console.error("Error planting tree:", err);
+      alert("Erro ao plantar semente. Verifique se as tabelas do Supabase estão configuradas.");
+    } finally {
+      setPlanting(false);
     }
   };
 
@@ -69,18 +86,21 @@ export default function KingdomTree({ user }: { user: User }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <SeedCard 
-            name="Oliveira da Paz" 
-            rarity="Comum" 
-            points="5 pts/estágio" 
-            onPlant={() => handlePlant(1)}
-          />
-          <SeedCard 
-            name="Cedro do Líbano" 
-            rarity="Rara" 
-            points="10 pts/estágio" 
-            onPlant={() => handlePlant(2)}
-          />
+          {treeTypes.map((type) => (
+            <SeedCard 
+              key={type.id}
+              name={type.name} 
+              rarity={type.rarity} 
+              points={`${type.points_per_stage} pts/estágio`} 
+              onPlant={() => handlePlant(type.id)}
+              disabled={planting}
+            />
+          ))}
+          {treeTypes.length === 0 && (
+            <div className="col-span-full text-center p-8 bg-stone-50 rounded-3xl border border-dashed border-stone-200">
+              <p className="text-stone-500">Nenhuma semente disponível no momento.</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -176,7 +196,7 @@ export default function KingdomTree({ user }: { user: User }) {
   );
 }
 
-function SeedCard({ name, rarity, points, onPlant }: any) {
+function SeedCard({ name, rarity, points, onPlant, disabled }: any) {
   return (
     <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm hover:border-red-200 transition-all group">
       <div className="w-16 h-16 bg-stone-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -193,9 +213,10 @@ function SeedCard({ name, rarity, points, onPlant }: any) {
       </div>
       <button 
         onClick={onPlant}
-        className="w-full py-3 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition-colors"
+        disabled={disabled}
+        className="w-full py-3 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
       >
-        Plantar Semente
+        {disabled ? <Loader2 className="animate-spin" size={18} /> : 'Plantar Semente'}
       </button>
     </div>
   );
