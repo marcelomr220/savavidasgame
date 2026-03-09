@@ -8,7 +8,8 @@ import {
   ChevronRight,
   Activity,
   UserCheck,
-  Database
+  Database,
+  Settings
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -79,6 +80,7 @@ export default function AdminDashboard() {
             <AdminLink to="/admin/attendance" icon={QrCode} title="Sessões de Presença" desc="Gerar novos códigos QR" />
             <AdminLink to="/admin/teams" icon={Users} title="Equipes" desc="Gerenciar times e líderes" />
             <AdminLink to="/admin/users" icon={UserCheck} title="Usuários" desc="Controle de acesso e pontos" />
+            <AdminLink to="/admin/settings" icon={Settings} title="Configurações" desc="Personalizar logo e aparência" />
           </div>
         </section>
 

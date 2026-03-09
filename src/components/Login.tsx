@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, Mail, Lock, ArrowRight, AlertCircle, User as UserIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../types';
-import { login, register } from '../services/api';
+import { login, register, getAppSettings } from '../services/api';
 
 export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -11,6 +11,15 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [logo, setLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLogo = async () => {
+      const logoUrl = await getAppSettings('login_logo');
+      if (logoUrl) setLogo(logoUrl);
+    };
+    fetchLogo();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,10 +49,16 @@ export default function Login({ onLogin }: { onLogin: (user: User) => void }) {
         className="max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-red-200 mx-auto mb-4">
-            <Star size={32} fill="currentColor" />
-          </div>
-          <h1 className="text-3xl font-bold text-stone-900">SalvaVidas</h1>
+          {logo ? (
+            <div className="w-24 h-24 mx-auto mb-4 overflow-hidden rounded-2xl shadow-xl border-4 border-white">
+              <img src={logo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            </div>
+          ) : (
+            <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-red-200 mx-auto mb-4">
+              <Star size={32} fill="currentColor" />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold text-stone-900">Salva Vidas</h1>
           <p className="text-stone-500">Comunidade Gamificada</p>
         </div>
 

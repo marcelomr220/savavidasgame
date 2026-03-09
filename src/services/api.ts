@@ -541,3 +541,23 @@ export async function waterTree(treeId: number, userId: number) {
   
   return { stage: newStage, pointsEarned };
 }
+
+// --- APP SETTINGS ---
+export async function getAppSettings(key: string) {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', key)
+    .single();
+  
+  if (error) return null;
+  return data?.value;
+}
+
+export async function updateAppSettings(key: string, value: string) {
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert({ key, value });
+  
+  if (error) throw error;
+}

@@ -33,6 +33,7 @@ import AdminTasks from './components/AdminTasks';
 import AdminAttendance from './components/AdminAttendance';
 import AdminTeams from './components/AdminTeams';
 import AdminUsers from './components/AdminUsers';
+import AdminSettings from './components/AdminSettings';
 import Login from './components/Login';
 
 import BottomNavigation from './components/BottomNavigation';
@@ -95,7 +96,7 @@ export default function App() {
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-sm">
             <Star size={24} fill="currentColor" />
           </div>
-          <span className="font-bold text-on-surface text-lg">SalvaVidas</span>
+          <span className="font-bold text-on-surface text-lg">Salva Vidas</span>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -116,7 +117,7 @@ export default function App() {
             <Star size={28} fill="currentColor" />
           </div>
           <div>
-            <h1 className="font-bold text-on-surface text-xl leading-tight">SalvaVidas</h1>
+            <h1 className="font-bold text-on-surface text-xl leading-tight">Salva Vidas</h1>
             <p className="text-xs text-on-surface-variant">Church Community</p>
           </div>
         </div>
@@ -212,6 +213,7 @@ export default function App() {
                     <Route path="/admin/attendance" element={<AdminAttendance />} />
                     <Route path="/admin/teams" element={<AdminTeams />} />
                     <Route path="/admin/users" element={<AdminUsers />} />
+                    <Route path="/admin/settings" element={<AdminSettings />} />
                   </>
                 )}
               </Routes>
