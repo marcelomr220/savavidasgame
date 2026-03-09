@@ -1,0 +1,92 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { ChevronLeft, Loader2, BookOpen } from 'lucide-react';
+import { getBookChapters, getBibleBooks } from '../../services/api';
+
+export default function ChapterList() {
+  const { bookId } = useParams();
+  const navigate = useNavigate();
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [book, setBook] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!bookId) return;
+
+    const fetchData = async () => {
+      try {
+        const [chaptersData, booksData] = await Promise.all([
+          getBookChapters(Number(bookId)),
+          getBibleBooks()
+        ]);
+        setChapters(chaptersData);
+        setBook(booksData.find((b: any) => b.id === Number(bookId)));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [bookId]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-stone-400">
+        <Loader2 className="animate-spin mb-4" size={32} />
+        <p>Carregando capítulos...</p>
+      </div>
+    );
+  }
+
+  if (!book) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-stone-500">Livro não encontrado.</p>
+        <button onClick={() => navigate('/bible')} className="mt-4 text-[#D4AF37] font-bold">Voltar ao Índice</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 pb-12">
+      <header className="flex items-center gap-4">
+        <button 
+          onClick={() => navigate('/bible')}
+          className="p-2 rounded-full hover:bg-stone-100 transition-colors"
+        >
+          <ChevronLeft size={24} />
+        </button>
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-stone-900">{book.name}</h1>
+          <p className="text-stone-500">Selecione um capítulo para iniciar a leitura ilustrada.</p>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {chapters.map((chapter) => (
+          <Link key={chapter.id} to={`/bible/read/${chapter.id}`}>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="aspect-square bg-white rounded-2xl border border-stone-200 shadow-sm flex flex-col items-center justify-center gap-2 group hover:border-[#D4AF37] hover:bg-stone-900 transition-all duration-300"
+            >
+              <span className="text-xs font-bold text-stone-400 uppercase tracking-widest group-hover:text-[#D4AF37]/60">Capítulo</span>
+              <span className="text-3xl font-serif font-bold text-stone-900 group-hover:text-white">{chapter.chapter_number}</span>
+              <BookOpen size={16} className="text-stone-300 group-hover:text-[#D4AF37]" />
+            </motion.div>
+          </Link>
+        ))}
+      </div>
+
+      {chapters.length === 0 && (
+        <div className="text-center py-20 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200">
+          <p className="text-stone-500 font-medium">Nenhum capítulo disponível para este livro.</p>
+          <p className="text-stone-400 text-sm">O administrador está trabalhando nisso!</p>
+        </div>
+      )}
+    </div>
+  );
+}

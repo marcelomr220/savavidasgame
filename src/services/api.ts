@@ -566,3 +566,61 @@ export async function updateAppSettings(key: string, value: string) {
     throw new Error(error.error || 'Erro ao salvar configurações');
   }
 }
+
+// --- BIBLE ILLUSTRATED ---
+export async function getBibleBooks() {
+  const response = await fetch('/api/bible/books');
+  return response.json();
+}
+
+export async function getBookChapters(bookId: number) {
+  const response = await fetch(`/api/bible/books/${bookId}/chapters`);
+  return response.json();
+}
+
+export async function getChapter(chapterId: number) {
+  const response = await fetch(`/api/bible/chapters/${chapterId}`);
+  const data = await response.json();
+  if (data.content && typeof data.content === 'string') {
+    data.content = JSON.parse(data.content);
+  }
+  return data;
+}
+
+export async function markChapterAsRead(chapterId: number, userId: number) {
+  const response = await fetch(`/api/bible/chapters/${chapterId}/read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId })
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Erro ao registrar leitura');
+  }
+  return response.json();
+}
+
+export async function createBibleChapter(data: any) {
+  const response = await fetch('/api/admin/bible/chapters', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return response.json();
+}
+
+export async function updateBibleChapter(id: number, data: any) {
+  const response = await fetch(`/api/admin/bible/chapters/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return response.json();
+}
+
+export async function deleteBibleChapter(id: number) {
+  const response = await fetch(`/api/admin/bible/chapters/${id}`, {
+    method: 'DELETE'
+  });
+  return response.json();
+}

@@ -14,7 +14,8 @@ import {
   Star,
   TreeDeciduous,
   Menu,
-  X
+  X,
+  Book
 } from 'lucide-react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,6 +35,11 @@ import AdminAttendance from './components/AdminAttendance';
 import AdminTeams from './components/AdminTeams';
 import AdminUsers from './components/AdminUsers';
 import AdminSettings from './components/AdminSettings';
+import BibleIndex from './components/BibleIllustrated/BibleIndex';
+import ChapterList from './components/BibleIllustrated/ChapterList';
+import ReadingView from './components/BibleIllustrated/ReadingView';
+import AdminBible from './components/BibleIllustrated/AdminBible';
+import ChapterEditor from './components/BibleIllustrated/ChapterEditor';
 import Login from './components/Login';
 
 import BottomNavigation from './components/BottomNavigation';
@@ -81,6 +87,7 @@ export default function App() {
     { path: '/tasks', icon: CheckSquare, label: 'Tarefas' },
     { path: '/attendance', icon: QrCode, label: 'Presença' },
     { path: '/games', icon: Gamepad2, label: 'Games' },
+    { path: '/bible', icon: Book, label: 'Bíblia' },
     { path: '/profile', icon: UserIcon, label: 'Perfil' },
   ];
 
@@ -203,6 +210,9 @@ export default function App() {
                 <Route path="/tasks" element={<Tasks user={user!} />} />
                 <Route path="/attendance" element={<Attendance user={user!} />} />
                 <Route path="/games/*" element={<Games user={user!} />} />
+                <Route path="/bible" element={<BibleIndex />} />
+                <Route path="/bible/book/:bookId" element={<ChapterList />} />
+                <Route path="/bible/read/:chapterId" element={<ReadingView user={user!} />} />
                 <Route path="/profile" element={<Profile user={user!} onUpdateUser={handleUpdateUser} />} />
                 <Route path="/login" element={<Login onLogin={handleLogin} />} />
                 
@@ -214,6 +224,9 @@ export default function App() {
                     <Route path="/admin/teams" element={<AdminTeams />} />
                     <Route path="/admin/users" element={<AdminUsers />} />
                     <Route path="/admin/settings" element={<AdminSettings />} />
+                    <Route path="/admin/bible" element={<AdminBible />} />
+                    <Route path="/admin/bible/new" element={<ChapterEditor />} />
+                    <Route path="/admin/bible/edit/:id" element={<ChapterEditor />} />
                   </>
                 )}
               </Routes>

@@ -143,6 +143,32 @@ if (db) {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS bible_books (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      image_url TEXT,
+      order_index INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS bible_chapters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      book_id INTEGER,
+      chapter_number INTEGER,
+      content TEXT, -- JSON array of {type: 'text'|'image', value: string}
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (book_id) REFERENCES bible_books (id)
+    );
+
+    CREATE TABLE IF NOT EXISTS user_bible_readings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      chapter_id INTEGER,
+      read_at DATE DEFAULT (date('now')),
+      points_awarded INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users (id),
+      FOREIGN KEY (chapter_id) REFERENCES bible_chapters (id)
+    );
   `);
 }
 
@@ -194,6 +220,15 @@ if (db) {
       .run("Quem construiu a arca?", "Moisés", "Noé", "Abraão", "Davi", "B", "Antigo Testamento", "Fácil");
     db.prepare("INSERT INTO biblical_questions (question, option_a, option_b, option_c, option_d, correct_option, category, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run("Qual o primeiro livro da Bíblia?", "Êxodo", "Levítico", "Gênesis", "Números", "C", "Antigo Testamento", "Fácil");
+    
+    // Seed Bible Books
+    const bibleBookCount = db.prepare("SELECT COUNT(*) as count FROM bible_books").get().count;
+    if (bibleBookCount === 0) {
+      db.prepare("INSERT INTO bible_books (name, image_url, order_index) VALUES (?, ?, ?)").run("Gênesis", "https://picsum.photos/seed/genesis/800/1200", 1);
+      db.prepare("INSERT INTO bible_books (name, image_url, order_index) VALUES (?, ?, ?)").run("Êxodo", "https://picsum.photos/seed/exodus/800/1200", 2);
+      db.prepare("INSERT INTO bible_books (name, image_url, order_index) VALUES (?, ?, ?)").run("Mateus", "https://picsum.photos/seed/matthew/800/1200", 40);
+      db.prepare("INSERT INTO bible_books (name, image_url, order_index) VALUES (?, ?, ?)").run("Apocalipse", "https://picsum.photos/seed/revelation/800/1200", 66);
+    }
   }
 }
 
@@ -1401,6 +1436,140 @@ async function startServer(app: any) {
       }
     }
     res.redirect(logoUrl);
+  });
+
+  // --- Bible Illustrated API ---
+  app.get("/api/bible/books", async (req, res) => {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from('bible_books').select('*').order('order_index');
+        if (!error) return res.json(data);
+      }
+      const books = db.prepare("SELECT * FROM bible_books ORDER BY order_index").all();
+      res.json(books);
+    } catch (err) {
+      res.status(500).json({ error: "Error fetching bible books" });
+    }
+  });
+
+  app.get("/api/bible/books/:bookId/chapters", async (req, res) => {
+    const { bookId } = req.params;
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from('bible_chapters').select('id, chapter_number').eq('book_id', bookId).order('chapter_number');
+        if (!error) return res.json(data);
+      }
+      const chapters = db.prepare("SELECT id, chapter_number FROM bible_chapters WHERE book_id = ? ORDER BY chapter_number").all(bookId);
+      res.json(chapters);
+    } catch (err) {
+      res.status(500).json({ error: "Error fetching chapters" });
+    }
+  });
+
+  app.get("/api/bible/chapters/:chapterId", async (req, res) => {
+    const { chapterId } = req.params;
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from('bible_chapters').select('*, bible_books(name)').eq('id', chapterId).single();
+        if (!error) return res.json(data);
+      }
+      const chapter = db.prepare(`
+        SELECT bc.*, bb.name as book_name 
+        FROM bible_chapters bc 
+        JOIN bible_books bb ON bc.book_id = bb.id 
+        WHERE bc.id = ?
+      `).get(chapterId);
+      res.json(chapter);
+    } catch (err) {
+      res.status(500).json({ error: "Error fetching chapter" });
+    }
+  });
+
+  app.post("/api/bible/chapters/:chapterId/read", async (req, res) => {
+    const { chapterId } = req.params;
+    const { userId } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+      // Check if already read today
+      const alreadyReadToday = db.prepare("SELECT id FROM user_bible_readings WHERE user_id = ? AND read_at = ?").get(userId, today);
+      if (alreadyReadToday) {
+        return res.status(400).json({ error: "Você já leu um capítulo hoje. Volte amanhã para ganhar mais pontos!" });
+      }
+
+      // Check if this specific chapter was ever read (to prevent double points for same chapter)
+      const chapterAlreadyRead = db.prepare("SELECT id FROM user_bible_readings WHERE user_id = ? AND chapter_id = ?").get(userId, chapterId);
+      
+      let pointsAwarded = 0;
+      if (!chapterAlreadyRead) {
+        pointsAwarded = 50;
+        await addPoints(userId, pointsAwarded);
+      }
+
+      db.prepare("INSERT INTO user_bible_readings (user_id, chapter_id, read_at, points_awarded) VALUES (?, ?, ?, ?)").run(userId, chapterId, today, pointsAwarded);
+      
+      if (supabase) {
+        await supabase.from('user_bible_readings').insert([{ user_id: userId, chapter_id: chapterId, read_at: today, points_awarded: pointsAwarded }]);
+      }
+
+      res.json({ success: true, pointsAwarded });
+    } catch (err) {
+      res.status(500).json({ error: "Error recording reading" });
+    }
+  });
+
+  // Admin Bible Routes
+  app.post("/api/admin/bible/books", async (req, res) => {
+    const { name, image_url, order_index } = req.body;
+    try {
+      const result = db.prepare("INSERT INTO bible_books (name, image_url, order_index) VALUES (?, ?, ?)").run(name, image_url, order_index || 0);
+      if (supabase) {
+        await supabase.from('bible_books').insert([{ id: result.lastInsertRowid, name, image_url, order_index: order_index || 0 }]);
+      }
+      res.json({ id: result.lastInsertRowid });
+    } catch (err) {
+      res.status(500).json({ error: "Error creating book" });
+    }
+  });
+
+  app.post("/api/admin/bible/chapters", async (req, res) => {
+    const { book_id, chapter_number, content } = req.body;
+    try {
+      const result = db.prepare("INSERT INTO bible_chapters (book_id, chapter_number, content) VALUES (?, ?, ?)").run(book_id, chapter_number, JSON.stringify(content));
+      if (supabase) {
+        await supabase.from('bible_chapters').insert([{ id: result.lastInsertRowid, book_id, chapter_number, content: JSON.stringify(content) }]);
+      }
+      res.json({ id: result.lastInsertRowid });
+    } catch (err) {
+      res.status(500).json({ error: "Error creating chapter" });
+    }
+  });
+
+  app.put("/api/admin/bible/chapters/:id", async (req, res) => {
+    const { id } = req.params;
+    const { book_id, chapter_number, content } = req.body;
+    try {
+      db.prepare("UPDATE bible_chapters SET book_id = ?, chapter_number = ?, content = ? WHERE id = ?").run(book_id, chapter_number, JSON.stringify(content), id);
+      if (supabase) {
+        await supabase.from('bible_chapters').update({ book_id, chapter_number, content: JSON.stringify(content) }).eq('id', id);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error updating chapter" });
+    }
+  });
+
+  app.delete("/api/admin/bible/chapters/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("DELETE FROM bible_chapters WHERE id = ?").run(id);
+      if (supabase) {
+        await supabase.from('bible_chapters').delete().eq('id', id);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error deleting chapter" });
+    }
   });
 
   // --- Vite Middleware ---
