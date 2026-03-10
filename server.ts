@@ -171,6 +171,16 @@ try {
       count INTEGER DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users (id)
     );
+
+    CREATE TABLE IF NOT EXISTS user_bible_readings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      chapter_id INTEGER,
+      read_at TEXT,
+      points_awarded INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users (id),
+      FOREIGN KEY (chapter_id) REFERENCES bible_chapters (id)
+    );
   `);
 
   // Ensure is_released column exists for bible_books
@@ -302,25 +312,25 @@ async function startServer(app: any) {
     }
 
     // Fallback to SQLite
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-    
-    if (user) {
-      const isMatch = user.password.startsWith('$2a$') || user.password.startsWith('$2b$') 
-        ? await bcrypt.compare(password, user.password)
-        : user.password === password;
+    if (db) {
+      const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+      
+      if (user) {
+        const isMatch = user.password.startsWith('$2a$') || user.password.startsWith('$2b$') 
+          ? await bcrypt.compare(password, user.password)
+          : user.password === password;
 
-      if (isMatch) {
-        if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashedPassword, user.id);
+        if (isMatch) {
+          if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashedPassword, user.id);
+          }
+          return res.json(user);
         }
-        res.json(user);
-      } else {
-        res.status(401).json({ error: "Credenciais inválidas" });
       }
-    } else {
-      res.status(401).json({ error: "Credenciais inválidas" });
     }
+
+    res.status(401).json({ error: "Credenciais inválidas" });
   });
 
   app.post("/api/register", async (req, res) => {
@@ -375,28 +385,55 @@ async function startServer(app: any) {
         return res.status(400).json({ error: "Este email já está cadastrado" });
       }
 
-      const result = db.prepare("INSERT INTO users (name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-        name, email, hashedPassword, 'user', 0, 1, 0
-      );
+      let lastId = Date.now();
+      if (db) {
+        const result = db.prepare("INSERT INTO users (name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+          name, email, hashedPassword, 'user', 0, 1, 0
+        );
+        lastId = result.lastInsertRowid;
+      }
       
-      const newUser = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
-      res.json(newUser);
+      if (supabase) {
+        await supabase.from('users').insert([{ id: lastId, name, email, password: hashedPassword, role: 'user', points: 0, level: 1, streak: 0 }]);
+      }
+      
+      if (db) {
+        const newUser = db.prepare("SELECT * FROM users WHERE id = ?").get(lastId);
+        return res.json(newUser);
+      }
+      
+      if (supabase) {
+        const { data } = await supabase.from('users').select('*').eq('id', lastId).single();
+        return res.json(data);
+      }
+      
+      res.json({ id: lastId, name, email, role: 'user', points: 0, level: 1, streak: 0 });
     } catch (err: any) {
       console.error("Registration error:", err);
       res.status(500).json({ error: err.message || "Erro ao realizar cadastro" });
     }
   });
 
-  // Admin GET endpoints (always SQLite for consistency)
+  // Admin GET endpoints
   app.get("/api/admin/users", async (req, res) => {
     try {
-      const users = db.prepare(`
-        SELECT u.*, t.name as team_name 
-        FROM users u 
-        LEFT JOIN teams t ON u.team_id = t.id 
-        ORDER BY u.points DESC
-      `).all();
-      res.json(users);
+      if (supabase) {
+        const { data, error } = await supabase.from('users').select('*, teams(name)').order('points', { ascending: false });
+        if (!error && data) {
+          return res.json(data.map(u => ({ ...u, team_name: u.teams?.name || null })));
+        }
+      }
+      
+      if (db) {
+        const users = db.prepare(`
+          SELECT u.*, t.name as team_name 
+          FROM users u 
+          LEFT JOIN teams t ON u.team_id = t.id 
+          ORDER BY u.points DESC
+        `).all();
+        return res.json(users);
+      }
+      res.json([]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -404,12 +441,24 @@ async function startServer(app: any) {
 
   app.get("/api/admin/teams", async (req, res) => {
     try {
-      const teams = db.prepare(`
-        SELECT t.*, (SELECT COUNT(*) FROM users WHERE team_id = t.id) as member_count 
-        FROM teams t
-        ORDER BY t.total_points DESC
-      `).all();
-      res.json(teams);
+      if (supabase) {
+        const { data, error } = await supabase.from('teams').select('*').order('total_points', { ascending: false });
+        if (!error && data) {
+          // For member count, we might need a separate query or a view in Supabase
+          // For now, let's just return the teams
+          return res.json(data);
+        }
+      }
+      
+      if (db) {
+        const teams = db.prepare(`
+          SELECT t.*, (SELECT COUNT(*) FROM users WHERE team_id = t.id) as member_count 
+          FROM teams t
+          ORDER BY t.total_points DESC
+        `).all();
+        return res.json(teams);
+      }
+      res.json([]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -417,8 +466,16 @@ async function startServer(app: any) {
 
   app.get("/api/admin/tasks", async (req, res) => {
     try {
-      const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
-      res.json(tasks);
+      if (supabase) {
+        const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+        if (!error && data) return res.json(data);
+      }
+      
+      if (db) {
+        const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
+        return res.json(tasks);
+      }
+      res.json([]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -426,23 +483,38 @@ async function startServer(app: any) {
 
   app.get("/api/admin/stats", async (req, res) => {
     try {
-      const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-      const activeTeams = db.prepare("SELECT COUNT(*) as count FROM teams").get().count;
-      const pendingTasks = db.prepare("SELECT COUNT(*) as count FROM user_tasks WHERE status = 'pending'").get().count;
+      if (supabase) {
+        const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
+        const { count: activeTeams } = await supabase.from('teams').select('*', { count: 'exact', head: true });
+        const { count: pendingTasks } = await supabase.from('user_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+        
+        return res.json({
+          totalUsers: totalUsers || 0,
+          activeTeams: activeTeams || 0,
+          pendingTasks: pendingTasks || 0,
+          monthlyAttendance: 0 // Placeholder or separate query
+        });
+      }
       
-      // Monthly attendance (last 30 days)
-      const monthlyAttendance = db.prepare(`
-        SELECT COUNT(*) as count 
-        FROM attendances 
-        WHERE created_at >= date('now', '-30 days')
-      `).get().count;
+      if (db) {
+        const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+        const activeTeams = db.prepare("SELECT COUNT(*) as count FROM teams").get().count;
+        const pendingTasks = db.prepare("SELECT COUNT(*) as count FROM user_tasks WHERE status = 'pending'").get().count;
+        
+        const monthlyAttendance = db.prepare(`
+          SELECT COUNT(*) as count 
+          FROM attendances 
+          WHERE created_at >= date('now', '-30 days')
+        `).get().count;
 
-      res.json({
-        totalUsers,
-        activeTeams,
-        pendingTasks,
-        monthlyAttendance
-      });
+        return res.json({
+          totalUsers,
+          activeTeams,
+          pendingTasks,
+          monthlyAttendance
+        });
+      }
+      res.json({ totalUsers: 0, activeTeams: 0, pendingTasks: 0, monthlyAttendance: 0 });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1669,13 +1741,17 @@ async function startServer(app: any) {
           query = query.eq('is_released', 1);
         }
         const { data, error } = await query;
-        if (!error) return res.json(data);
+        if (!error && data) return res.json(data);
       }
-      const query = isAdmin === 'true' 
-        ? "SELECT * FROM bible_books ORDER BY order_index" 
-        : "SELECT * FROM bible_books WHERE is_released = 1 ORDER BY order_index";
-      const books = db.prepare(query).all();
-      res.json(books);
+      
+      if (db) {
+        const query = isAdmin === 'true' 
+          ? "SELECT * FROM bible_books ORDER BY order_index" 
+          : "SELECT * FROM bible_books WHERE is_released = 1 ORDER BY order_index";
+        const books = db.prepare(query).all();
+        return res.json(books);
+      }
+      res.json([]);
     } catch (err) {
       res.status(500).json({ error: "Error fetching bible books" });
     }
@@ -1702,10 +1778,14 @@ async function startServer(app: any) {
     try {
       if (supabase) {
         const { data, error } = await supabase.from('bible_chapters').select('id, chapter_number, title').eq('book_id', bookId).order('chapter_number');
-        if (!error) return res.json(data);
+        if (!error && data) return res.json(data);
       }
-      const chapters = db.prepare("SELECT id, chapter_number, title FROM bible_chapters WHERE book_id = ? ORDER BY chapter_number").all(bookId);
-      res.json(chapters);
+      
+      if (db) {
+        const chapters = db.prepare("SELECT id, chapter_number, title FROM bible_chapters WHERE book_id = ? ORDER BY chapter_number").all(bookId);
+        return res.json(chapters);
+      }
+      res.json([]);
     } catch (err) {
       res.status(500).json({ error: "Error fetching chapters" });
     }
@@ -1716,15 +1796,19 @@ async function startServer(app: any) {
     try {
       if (supabase) {
         const { data, error } = await supabase.from('bible_chapters').select('*, bible_books(name)').eq('id', chapterId).single();
-        if (!error) return res.json(data);
+        if (!error && data) return res.json(data);
       }
-      const chapter = db.prepare(`
-        SELECT bc.*, bb.name as book_name 
-        FROM bible_chapters bc 
-        JOIN bible_books bb ON bc.book_id = bb.id 
-        WHERE bc.id = ?
-      `).get(chapterId);
-      res.json(chapter);
+      
+      if (db) {
+        const chapter = db.prepare(`
+          SELECT bc.*, bb.name as book_name 
+          FROM bible_chapters bc 
+          JOIN bible_books bb ON bc.book_id = bb.id 
+          WHERE bc.id = ?
+        `).get(chapterId);
+        return res.json(chapter);
+      }
+      res.json(null);
     } catch (err) {
       res.status(500).json({ error: "Error fetching chapter" });
     }
@@ -1737,13 +1821,28 @@ async function startServer(app: any) {
 
     try {
       // Check if already read today
-      const alreadyReadToday = db.prepare("SELECT id FROM user_bible_readings WHERE user_id = ? AND read_at = ?").get(userId, today);
+      let alreadyReadToday = false;
+      if (supabase) {
+        const { data } = await supabase.from('user_bible_readings').select('id').eq('user_id', userId).eq('read_at', today).single();
+        if (data) alreadyReadToday = true;
+      } else if (db) {
+        const result = db.prepare("SELECT id FROM user_bible_readings WHERE user_id = ? AND read_at = ?").get(userId, today);
+        if (result) alreadyReadToday = true;
+      }
+
       if (alreadyReadToday) {
         return res.status(400).json({ error: "Você já leu um capítulo hoje. Volte amanhã para ganhar mais pontos!" });
       }
 
       // Check if this specific chapter was ever read (to prevent double points for same chapter)
-      const chapterAlreadyRead = db.prepare("SELECT id FROM user_bible_readings WHERE user_id = ? AND chapter_id = ?").get(userId, chapterId);
+      let chapterAlreadyRead = false;
+      if (supabase) {
+        const { data } = await supabase.from('user_bible_readings').select('id').eq('user_id', userId).eq('chapter_id', chapterId).single();
+        if (data) chapterAlreadyRead = true;
+      } else if (db) {
+        const result = db.prepare("SELECT id FROM user_bible_readings WHERE user_id = ? AND chapter_id = ?").get(userId, chapterId);
+        if (result) chapterAlreadyRead = true;
+      }
       
       let pointsAwarded = 0;
       if (!chapterAlreadyRead) {
@@ -1751,7 +1850,9 @@ async function startServer(app: any) {
         await addPoints(userId, pointsAwarded);
       }
 
-      db.prepare("INSERT INTO user_bible_readings (user_id, chapter_id, read_at, points_awarded) VALUES (?, ?, ?, ?)").run(userId, chapterId, today, pointsAwarded);
+      if (db) {
+        db.prepare("INSERT INTO user_bible_readings (user_id, chapter_id, read_at, points_awarded) VALUES (?, ?, ?, ?)").run(userId, chapterId, today, pointsAwarded);
+      }
       
       if (supabase) {
         await supabase.from('user_bible_readings').insert([{ user_id: userId, chapter_id: chapterId, read_at: today, points_awarded: pointsAwarded }]);
@@ -1767,11 +1868,15 @@ async function startServer(app: any) {
   app.post("/api/admin/bible/books", async (req, res) => {
     const { name, image_url, order_index } = req.body;
     try {
-      const result = db.prepare("INSERT INTO bible_books (name, image_url, order_index) VALUES (?, ?, ?)").run(name, image_url, order_index || 0);
-      if (supabase) {
-        await supabase.from('bible_books').insert([{ id: result.lastInsertRowid, name, image_url, order_index: order_index || 0 }]);
+      let lastId = Date.now();
+      if (db) {
+        const result = db.prepare("INSERT INTO bible_books (name, image_url, order_index) VALUES (?, ?, ?)").run(name, image_url, order_index || 0);
+        lastId = result.lastInsertRowid;
       }
-      res.json({ id: result.lastInsertRowid });
+      if (supabase) {
+        await supabase.from('bible_books').insert([{ id: lastId, name, image_url, order_index: order_index || 0 }]);
+      }
+      res.json({ id: lastId });
     } catch (err) {
       res.status(500).json({ error: "Error creating book" });
     }
@@ -1780,11 +1885,15 @@ async function startServer(app: any) {
   app.post("/api/admin/bible/chapters", async (req, res) => {
     const { book_id, chapter_number, title, content } = req.body;
     try {
-      const result = db.prepare("INSERT INTO bible_chapters (book_id, chapter_number, title, content) VALUES (?, ?, ?, ?)").run(book_id, chapter_number, title, JSON.stringify(content));
-      if (supabase) {
-        await supabase.from('bible_chapters').insert([{ id: result.lastInsertRowid, book_id, chapter_number, title, content: JSON.stringify(content) }]);
+      let lastId = Date.now();
+      if (db) {
+        const result = db.prepare("INSERT INTO bible_chapters (book_id, chapter_number, title, content) VALUES (?, ?, ?, ?)").run(book_id, chapter_number, title, JSON.stringify(content));
+        lastId = result.lastInsertRowid;
       }
-      res.json({ id: result.lastInsertRowid });
+      if (supabase) {
+        await supabase.from('bible_chapters').insert([{ id: lastId, book_id, chapter_number, title, content: JSON.stringify(content) }]);
+      }
+      res.json({ id: lastId });
     } catch (err) {
       res.status(500).json({ error: "Error creating chapter" });
     }
@@ -1794,7 +1903,9 @@ async function startServer(app: any) {
     const { id } = req.params;
     const { book_id, chapter_number, title, content } = req.body;
     try {
-      db.prepare("UPDATE bible_chapters SET book_id = ?, chapter_number = ?, title = ?, content = ? WHERE id = ?").run(book_id, chapter_number, title, JSON.stringify(content), id);
+      if (db) {
+        db.prepare("UPDATE bible_chapters SET book_id = ?, chapter_number = ?, title = ?, content = ? WHERE id = ?").run(book_id, chapter_number, title, JSON.stringify(content), id);
+      }
       if (supabase) {
         await supabase.from('bible_chapters').update({ book_id, chapter_number, title, content: JSON.stringify(content) }).eq('id', id);
       }
@@ -1807,7 +1918,9 @@ async function startServer(app: any) {
   app.delete("/api/admin/bible/chapters/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare("DELETE FROM bible_chapters WHERE id = ?").run(id);
+      if (db) {
+        db.prepare("DELETE FROM bible_chapters WHERE id = ?").run(id);
+      }
       if (supabase) {
         await supabase.from('bible_chapters').delete().eq('id', id);
       }
