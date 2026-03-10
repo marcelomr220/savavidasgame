@@ -191,103 +191,65 @@ export async function deleteTeam(teamId: number) {
 
 // --- TASKS ---
 export async function getTasks(): Promise<Task[]> {
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .order('created_at', { ascending: false });
-  
-  if (error) throw error;
-  return data as Task[];
+  const response = await fetch('/api/tasks');
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function getPendingTasks(): Promise<UserTask[]> {
+  const response = await fetch('/api/admin/tasks/pending');
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function verifyTask(userTaskId: number, status: 'verified' | 'rejected', userId: number, points: number) {
+  const response = await fetch(`/api/admin/tasks/verify/${userTaskId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, userId, points })
+  });
+  return response.json();
 }
 
 export async function createTask(taskData: Partial<Task>) {
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert([taskData])
-    .select()
-    .single();
-  
-  if (error) throw error;
-  return data;
+  const response = await fetch('/api/admin/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(taskData)
+  });
+  return response.json();
 }
 
 export async function updateTask(taskId: number, taskData: Partial<Task>) {
-  const { error } = await supabase
-    .from('tasks')
-    .update(taskData)
-    .eq('id', taskId);
-  
-  if (error) throw error;
-  return true;
+  const response = await fetch(`/api/admin/tasks/${taskId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(taskData)
+  });
+  return response.json();
 }
 
 export async function deleteTask(taskId: number) {
-  await supabase.from('user_tasks').delete().eq('task_id', taskId);
-  
-  const { error } = await supabase
-    .from('tasks')
-    .delete()
-    .eq('id', taskId);
-  
-  if (error) throw error;
-  return true;
+  const response = await fetch(`/api/admin/tasks/${taskId}`, {
+    method: 'DELETE'
+  });
+  return response.json();
 }
 
 export async function completeTask(userId: number, taskId: number, proofUrl: string) {
-  const { error } = await supabase
-    .from('user_tasks')
-    .insert([{
-      user_id: userId,
-      task_id: taskId,
-      proof_url: proofUrl,
-      status: 'pending'
-    }]);
-  
-  if (error) throw error;
+  const response = await fetch('/api/tasks/complete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, taskId, proofUrl })
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Erro ao concluir tarefa');
+  }
   return true;
 }
 
 // --- ADMIN / VERIFICATION ---
-export async function getPendingTasks(): Promise<UserTask[]> {
-  const { data, error } = await supabase
-    .from('user_tasks')
-    .select('*, users(name), tasks(title, points)')
-    .eq('status', 'pending');
-  
-  if (error) throw error;
-  
-  return (data || []).map(ut => ({
-    ...ut,
-    user_name: ut.users?.name,
-    task_title: ut.tasks?.title,
-    points: ut.tasks?.points
-  })) as UserTask[];
-}
-
-export async function verifyTask(userTaskId: number, status: 'verified' | 'rejected', userId: number, points: number) {
-  const { error } = await supabase
-    .from('user_tasks')
-    .update({ 
-      status, 
-      verified_at: new Date().toISOString() 
-    })
-    .eq('id', userTaskId);
-  
-  if (error) throw error;
-  
-  if (status === 'verified') {
-    // Add points to user
-    const { data: user } = await supabase.from('users').select('points').eq('id', userId).single();
-    if (user) {
-      const newPoints = user.points + points;
-      const newLevel = Math.floor(newPoints / 100) + 1;
-      await supabase.from('users').update({ points: newPoints, level: newLevel }).eq('id', userId);
-    }
-  }
-  
-  return true;
-}
-
 export async function getAdminStats() {
   const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
   const { count: activeTeams } = await supabase.from('teams').select('*', { count: 'exact', head: true });
@@ -415,28 +377,60 @@ export async function checkIn(userId: number, code: string) {
   return session.points;
 }
 
+// --- GAMES ---
+export async function getGamePlays(userId: number, gameId: string): Promise<number> {
+  const response = await fetch(`/api/games/plays?userId=${userId}&gameId=${gameId}`);
+  if (!response.ok) return 0;
+  const data = await response.json();
+  return data.count || 0;
+}
+
+export async function recordGamePlay(userId: number, gameId: string): Promise<number> {
+  const response = await fetch('/api/games/record-play', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, gameId })
+  });
+  if (!response.ok) return 0;
+  const data = await response.json();
+  return data.count || 0;
+}
+
 // --- QUIZ ---
-export async function getDailyQuiz(): Promise<BiblicalQuestion[]> {
-  const { data, error } = await supabase
-    .from('biblical_questions')
-    .select('*')
-    .limit(3); // Return 3 questions for the daily quiz
-  
-  if (error) throw error;
-  return data as BiblicalQuestion[];
+export async function getDailyQuiz(userId?: number): Promise<BiblicalQuestion[]> {
+  const url = userId ? `/api/quiz/daily?userId=${userId}` : '/api/quiz/daily';
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      let errorMessage = `Erro ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        // Not a JSON response, maybe HTML error page
+      }
+      throw new Error(errorMessage);
+    }
+    return response.json();
+  } catch (err: any) {
+    console.error("Quiz fetch error:", err);
+    throw err;
+  }
 }
 
 export async function submitQuiz(userId: number, score: number) {
-  if (score > 0) {
-    const { data: user } = await supabase.from('users').select('points').eq('id', userId).single();
-    if (user) {
-      const newPoints = user.points + score;
-      const newLevel = Math.floor(newPoints / 100) + 1;
-      await supabase.from('users').update({ points: newPoints, level: newLevel }).eq('id', userId);
-      return score;
-    }
+  const response = await fetch('/api/quiz/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, score })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Erro ao enviar quiz');
   }
-  return 0;
+  
+  return score;
 }
 
 // --- TREES ---
@@ -568,8 +562,17 @@ export async function updateAppSettings(key: string, value: string) {
 }
 
 // --- BIBLE ILLUSTRATED ---
-export async function getBibleBooks() {
-  const response = await fetch('/api/bible/books');
+export async function getBibleBooks(isAdmin: boolean = false) {
+  const response = await fetch(`/api/bible/books?isAdmin=${isAdmin}`);
+  return response.json();
+}
+
+export async function toggleBookRelease(bookId: number, isReleased: boolean) {
+  const response = await fetch(`/api/admin/bible/books/${bookId}/release`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isReleased })
+  });
   return response.json();
 }
 

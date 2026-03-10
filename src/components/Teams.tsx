@@ -111,7 +111,8 @@ export default function Teams({ user }: { user: User }) {
               ) : (
                 <button
                   onClick={(e) => handleJoinTeam(e, team.id)}
-                  className="w-full py-3 px-4 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition-colors flex items-center justify-center gap-2"
+                  disabled={user.team_id !== null && user.team_id !== undefined}
+                  className="w-full py-3 px-4 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <UserPlus size={18} />
                   Entrar na Equipe

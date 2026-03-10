@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Edit2, Trash2, Book, Loader2, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Book, Loader2, ChevronRight, Image as ImageIcon, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getBibleBooks, getBookChapters, deleteBibleChapter } from '../../services/api';
+import { getBibleBooks, getBookChapters, deleteBibleChapter, toggleBookRelease } from '../../services/api';
 
 export default function AdminBible() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export default function AdminBible() {
   const [loadingChapters, setLoadingChapters] = useState(false);
 
   useEffect(() => {
-    getBibleBooks()
+    getBibleBooks(true)
       .then(data => {
         setBooks(data);
         if (data.length > 0) setSelectedBookId(data[0].id);
@@ -39,6 +39,15 @@ export default function AdminBible() {
       setChapters(chapters.filter(c => c.id !== id));
     } catch (err) {
       alert('Erro ao excluir capítulo');
+    }
+  };
+
+  const handleToggleRelease = async (bookId: number, currentStatus: number) => {
+    try {
+      await toggleBookRelease(bookId, currentStatus === 0);
+      setBooks(books.map(b => b.id === bookId ? { ...b, is_released: currentStatus === 0 ? 1 : 0 } : b));
+    } catch (err) {
+      alert('Erro ao atualizar status do livro');
     }
   };
 
@@ -75,11 +84,27 @@ export default function AdminBible() {
                     : 'text-stone-600 hover:bg-stone-50'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Book size={18} />
-                  <span>{book.name}</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <Book size={18} />
+                    <span>{book.name}</span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleRelease(book.id, book.is_released);
+                    }}
+                    className={`p-1.5 rounded-lg transition-all ${
+                      book.is_released === 1 
+                        ? 'text-green-600 hover:bg-green-50' 
+                        : 'text-stone-400 hover:bg-stone-100'
+                    }`}
+                    title={book.is_released === 1 ? 'Livro Liberado' : 'Livro Oculto'}
+                  >
+                    {book.is_released === 1 ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+                  <ChevronRight size={16} className={selectedBookId === book.id ? 'opacity-100' : 'opacity-0'} />
                 </div>
-                <ChevronRight size={16} className={selectedBookId === book.id ? 'opacity-100' : 'opacity-0'} />
               </button>
             ))}
           </div>

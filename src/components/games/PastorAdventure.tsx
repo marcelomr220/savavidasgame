@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Sword, Star, Trophy, ArrowRight, Shield } from 'lucide-react';
+import { Sword, Star, Trophy, ArrowRight, Shield, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../../types';
 import { useNavigate } from 'react-router-dom';
-import { submitQuiz } from '../../services/api';
+import { submitQuiz, getGamePlays, recordGamePlay } from '../../services/api';
 
 export default function PastorAdventure({ user }: { user: User }) {
   const navigate = useNavigate();
@@ -11,8 +11,21 @@ export default function PastorAdventure({ user }: { user: User }) {
   const [playing, setPlaying] = useState(false);
   const [almas, setAlmas] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [playsToday, setPlaysToday] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const startMission = () => {
+  useEffect(() => {
+    getGamePlays(user.id, 'pastor_adventure')
+      .then(count => {
+        setPlaysToday(count);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [user.id]);
+
+  const startMission = async () => {
+    if (playsToday >= 3) return;
+    
     setPlaying(true);
     setAlmas(0);
     setTimeLeft(15);
@@ -32,6 +45,10 @@ export default function PastorAdventure({ user }: { user: User }) {
   const handleFinish = async () => {
     setPlaying(false);
     try {
+      // Record play
+      const newCount = await recordGamePlay(user.id, 'pastor_adventure');
+      setPlaysToday(newCount);
+
       // Points based on almas collected, max 50
       const points = Math.min(almas * 5, 50);
       if (points > 0) {
@@ -53,7 +70,7 @@ export default function PastorAdventure({ user }: { user: User }) {
           x: Math.random() * 200 - 100,
           y: Math.random() * 200 - 100
         });
-      }, 800);
+      }, 500);
       return () => clearInterval(interval);
     }
   }, [playing]);
@@ -68,11 +85,17 @@ export default function PastorAdventure({ user }: { user: User }) {
     });
   };
 
+  if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>;
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <header className="text-center">
         <h3 className="text-2xl font-bold text-stone-900">Aventura do Pastor</h3>
         <p className="text-stone-500">Ajude o pastor a levar a Palavra para todas as nações.</p>
+        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-stone-100 rounded-full text-xs font-bold text-stone-500">
+          <Sword size={12} />
+          <span>Tentativas hoje: {playsToday} / 3</span>
+        </div>
       </header>
 
       <div className="bg-stone-900 p-8 rounded-[40px] shadow-2xl min-h-[400px] flex flex-col items-center justify-center relative overflow-hidden">
@@ -104,13 +127,28 @@ export default function PastorAdventure({ user }: { user: User }) {
                 </div>
               </div>
             </div>
-            <button 
-              onClick={startMission}
-              className="px-12 py-4 bg-red-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-red-700 hover:scale-105 transition-all flex items-center gap-3 mx-auto"
-            >
-              Iniciar Missão
-              <ArrowRight size={24} />
-            </button>
+            
+            {playsToday >= 3 ? (
+              <div className="bg-amber-400/10 border border-amber-400/20 p-6 rounded-3xl max-w-xs mx-auto">
+                <AlertCircle className="text-amber-400 mx-auto mb-2" size={32} />
+                <p className="text-amber-400 font-bold">Limite diário atingido!</p>
+                <p className="text-stone-400 text-xs mt-1">Você já jogou 3 vezes hoje. Volte amanhã para novas missões!</p>
+                <button 
+                  onClick={() => navigate('/games')}
+                  className="mt-4 px-6 py-2 bg-white/10 text-white rounded-xl text-sm font-bold hover:bg-white/20 transition-all"
+                >
+                  Ver outros games
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={startMission}
+                className="px-12 py-4 bg-red-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-red-700 hover:scale-105 transition-all flex items-center gap-3 mx-auto"
+              >
+                Iniciar Missão
+                <ArrowRight size={24} />
+              </button>
+            )}
           </div>
         ) : playing ? (
           <div className="relative z-10 text-center space-y-8 w-full h-full flex flex-col items-center justify-center">

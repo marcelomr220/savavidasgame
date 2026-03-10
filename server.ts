@@ -149,7 +149,8 @@ try {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       image_url TEXT,
-      order_index INTEGER DEFAULT 0
+      order_index INTEGER DEFAULT 0,
+      is_released INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS bible_chapters (
@@ -162,16 +163,24 @@ try {
       FOREIGN KEY (book_id) REFERENCES bible_books (id)
     );
 
-    CREATE TABLE IF NOT EXISTS user_bible_readings (
+    CREATE TABLE IF NOT EXISTS game_plays (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
-      chapter_id INTEGER,
-      read_at DATE DEFAULT (date('now')),
-      points_awarded INTEGER DEFAULT 0,
-      FOREIGN KEY (user_id) REFERENCES users (id),
-      FOREIGN KEY (chapter_id) REFERENCES bible_chapters (id)
+      game_id TEXT,
+      date TEXT,
+      count INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users (id)
     );
   `);
+
+  // Ensure is_released column exists for bible_books
+  try {
+    if (db) {
+      db.prepare("ALTER TABLE bible_books ADD COLUMN is_released INTEGER DEFAULT 0").run();
+    }
+  } catch (e) {
+    // Column already exists
+  }
 
   // Ensure title column exists for existing tables
   try {
@@ -180,6 +189,7 @@ try {
     }
   } catch (e) {
     // Column already exists or table doesn't exist yet
+  }
   }
 } catch (err) {
   console.error("Database initialization error:", err);
@@ -1205,20 +1215,78 @@ async function startServer(app: any) {
 
   // Games - Quiz
   app.get("/api/quiz/daily", async (req, res) => {
-    if (supabase) {
-      const { data: questions, error } = await supabase
-        .from('biblical_questions')
-        .select('*')
-        .eq('is_active', true);
-      
-      if (!error && questions.length > 0) {
-        // Shuffle and take 3
-        const shuffled = questions.sort(() => 0.5 - Math.random()).slice(0, 3);
-        return res.json(shuffled);
+    const userId = req.query.userId;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (userId && userId !== 'undefined') {
+      try {
+        const attempt = db.prepare("SELECT * FROM daily_quizzes WHERE user_id = ? AND date = ?").get(userId, today);
+        if (attempt) {
+          return res.status(403).json({ error: "Você já realizou o quiz hoje. Volte amanhã!" });
+        }
+      } catch (e) {
+        console.error("Error checking quiz attempt:", e);
       }
     }
-    const questions = db.prepare("SELECT * FROM biblical_questions WHERE is_active = 1 ORDER BY RANDOM() LIMIT 3").all();
-    res.json(questions);
+
+    try {
+      if (supabase) {
+        const { data: questions, error } = await supabase
+          .from('biblical_questions')
+          .select('*')
+          .eq('is_active', true);
+        
+        if (!error && questions && questions.length > 0) {
+          const shuffled = questions.sort(() => 0.5 - Math.random()).slice(0, 3);
+          return res.json(shuffled);
+        }
+      }
+      const questions = db.prepare("SELECT * FROM biblical_questions WHERE is_active = 1 ORDER BY RANDOM() LIMIT 3").all();
+      res.json(questions);
+    } catch (err) {
+      console.error("Quiz daily error:", err);
+      res.status(500).json({ error: "Erro ao buscar quiz" });
+    }
+  });
+
+  // Games - Play Tracking
+  app.get("/api/games/plays", async (req, res) => {
+    const { userId, gameId } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (!userId || !gameId) {
+      return res.status(400).json({ error: "userId and gameId are required" });
+    }
+
+    try {
+      const play = db.prepare("SELECT count FROM game_plays WHERE user_id = ? AND game_id = ? AND date = ?").get(userId, gameId, today);
+      res.json({ count: play ? play.count : 0 });
+    } catch (err) {
+      res.status(500).json({ error: "Error fetching plays" });
+    }
+  });
+
+  app.post("/api/games/record-play", async (req, res) => {
+    const { userId, gameId } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (!userId || !gameId) {
+      return res.status(400).json({ error: "userId and gameId are required" });
+    }
+
+    try {
+      const play = db.prepare("SELECT id, count FROM game_plays WHERE user_id = ? AND game_id = ? AND date = ?").get(userId, gameId, today);
+      
+      if (play) {
+        db.prepare("UPDATE game_plays SET count = count + 1 WHERE id = ?").run(play.id);
+        res.json({ success: true, count: play.count + 1 });
+      } else {
+        db.prepare("INSERT INTO game_plays (user_id, game_id, date, count) VALUES (?, ?, ?, ?)").run(userId, gameId, today, 1);
+        res.json({ success: true, count: 1 });
+      }
+    } catch (err) {
+      res.status(500).json({ error: "Error recording play" });
+    }
   });
 
   app.post("/api/quiz/submit", async (req, res) => {
@@ -1451,17 +1519,181 @@ async function startServer(app: any) {
     res.redirect(logoUrl);
   });
 
-  // --- Bible Illustrated API ---
-  app.get("/api/bible/books", async (req, res) => {
+  // --- Tasks API ---
+  app.get("/api/admin/tasks/pending", async (req, res) => {
     try {
       if (supabase) {
-        const { data, error } = await supabase.from('bible_books').select('*').order('order_index');
+        const { data, error } = await supabase
+          .from('user_tasks')
+          .select('*, tasks(title, points), users(name)')
+          .eq('status', 'pending');
+        
+        if (!error) {
+          const formatted = data.map(d => ({
+            id: d.id,
+            user_id: d.user_id,
+            task_id: d.task_id,
+            status: d.status,
+            proof_url: d.proof_url,
+            user_name: d.users?.name,
+            task_title: d.tasks?.title,
+            points: d.tasks?.points
+          }));
+          return res.json(formatted);
+        }
+      }
+      
+      const pending = db.prepare(`
+        SELECT ut.*, u.name as user_name, t.title as task_title, t.points
+        FROM user_tasks ut
+        JOIN users u ON ut.user_id = u.id
+        JOIN tasks t ON ut.task_id = t.id
+        WHERE ut.status = 'pending'
+      `).all();
+      res.json(pending);
+    } catch (err) {
+      res.status(500).json({ error: "Error fetching pending tasks" });
+    }
+  });
+
+  app.post("/api/admin/tasks/verify/:id", async (req, res) => {
+    const { id } = req.params;
+    const { status, userId, points } = req.body;
+    try {
+      if (db) {
+        db.prepare("UPDATE user_tasks SET status = ? WHERE id = ?").run(status, id);
+        if (status === 'verified') {
+          db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(points, userId);
+        }
+      }
+      if (supabase) {
+        await supabase.from('user_tasks').update({ status }).eq('id', id);
+        if (status === 'verified') {
+          const { data: user } = await supabase.from('users').select('points').eq('id', userId).single();
+          await supabase.from('users').update({ points: (user?.points || 0) + points }).eq('id', userId);
+        }
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error verifying task" });
+    }
+  });
+
+  app.get("/api/tasks", async (req, res) => {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         if (!error) return res.json(data);
       }
-      const books = db.prepare("SELECT * FROM bible_books ORDER BY order_index").all();
+      const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
+      res.json(tasks);
+    } catch (err) {
+      res.status(500).json({ error: "Error fetching tasks" });
+    }
+  });
+
+  app.post("/api/tasks/complete", async (req, res) => {
+    const { userId, taskId, proofUrl } = req.body;
+    try {
+      if (db) {
+        db.prepare("INSERT INTO user_tasks (user_id, task_id, proof_url, status) VALUES (?, ?, ?, ?)").run(userId, taskId, proofUrl, 'pending');
+      }
+      if (supabase) {
+        await supabase.from('user_tasks').insert([{ user_id: userId, task_id: taskId, proof_url: proofUrl, status: 'pending' }]);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error completing task" });
+    }
+  });
+
+  app.post("/api/admin/tasks", async (req, res) => {
+    const taskData = req.body;
+    try {
+      if (db) {
+        const { title, description, points, category, type, is_active, is_recurring, available_from, deadline } = taskData;
+        db.prepare("INSERT INTO tasks (title, description, points, category, type, is_active, is_recurring, available_from, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+          title, description, points, category, type, is_active || 1, is_recurring, available_from, deadline
+        );
+      }
+      if (supabase) {
+        await supabase.from('tasks').insert([taskData]);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error creating task" });
+    }
+  });
+
+  app.put("/api/admin/tasks/:id", async (req, res) => {
+    const { id } = req.params;
+    const taskData = req.body;
+    try {
+      if (db) {
+        const { title, description, points, category, type, is_active, is_recurring, available_from, deadline } = taskData;
+        db.prepare("UPDATE tasks SET title = ?, description = ?, points = ?, category = ?, type = ?, is_active = ?, is_recurring = ?, available_from = ?, deadline = ? WHERE id = ?").run(
+          title, description, points, category, type, is_active, is_recurring, available_from, deadline, id
+        );
+      }
+      if (supabase) {
+        await supabase.from('tasks').update(taskData).eq('id', id);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error updating task" });
+    }
+  });
+
+  app.delete("/api/admin/tasks/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      if (db) {
+        db.prepare("DELETE FROM user_tasks WHERE task_id = ?").run(id);
+        db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
+      }
+      if (supabase) {
+        await supabase.from('user_tasks').delete().eq('task_id', id);
+        await supabase.from('tasks').delete().eq('id', id);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error deleting task" });
+    }
+  });
+  app.get("/api/bible/books", async (req, res) => {
+    const { isAdmin } = req.query;
+    try {
+      if (supabase) {
+        let query = supabase.from('bible_books').select('*').order('order_index');
+        if (isAdmin !== 'true') {
+          query = query.eq('is_released', 1);
+        }
+        const { data, error } = await query;
+        if (!error) return res.json(data);
+      }
+      const query = isAdmin === 'true' 
+        ? "SELECT * FROM bible_books ORDER BY order_index" 
+        : "SELECT * FROM bible_books WHERE is_released = 1 ORDER BY order_index";
+      const books = db.prepare(query).all();
       res.json(books);
     } catch (err) {
       res.status(500).json({ error: "Error fetching bible books" });
+    }
+  });
+
+  app.post("/api/admin/bible/books/:id/release", async (req, res) => {
+    const { id } = req.params;
+    const { isReleased } = req.body;
+    try {
+      if (db) {
+        db.prepare("UPDATE bible_books SET is_released = ? WHERE id = ?").run(isReleased ? 1 : 0, id);
+      }
+      if (supabase) {
+        await supabase.from('bible_books').update({ is_released: isReleased ? 1 : 0 }).eq('id', id);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error updating book release status" });
     }
   });
 

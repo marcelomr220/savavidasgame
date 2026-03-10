@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Trophy, User } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, User, Book } from 'lucide-react';
 
 export default function BottomNavigation() {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/', icon: LayoutDashboard, label: 'Início' },
+    { path: '/bible', icon: Book, label: 'Bíblia' },
     { path: '/teams', icon: Users, label: 'Equipes' },
     { path: '/ranking', icon: Trophy, label: 'Ranking' },
     { path: '/profile', icon: User, label: 'Perfil' },

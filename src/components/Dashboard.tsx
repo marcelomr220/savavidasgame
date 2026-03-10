@@ -12,7 +12,8 @@ import {
   QrCode,
   CheckSquare,
   X,
-  Clock
+  Clock,
+  Book
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -310,8 +311,9 @@ export default function Dashboard({ user }: { user: User }) {
       {/* Quick Actions */}
       <section>
         <h3 className="text-lg font-bold text-on-surface mb-4">Ações Rápidas</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <ActionLink to="/attendance" icon={QrCode} title="Presença" desc="Registrar com QR Code" />
+          <ActionLink to="/bible" icon={Book} title="Bíblia" desc="Leitura diária" />
           <ActionLink to="/games" icon={Gamepad2} title="Jogar" desc="Ganhe pontos extras" />
           <ActionLink to="/tasks" icon={CheckSquare} title="Missões" desc="Confira suas tarefas" />
         </div>

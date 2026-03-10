@@ -14,11 +14,12 @@ export default function Tasks({ user }: { user: User }) {
   useEffect(() => {
     getTasks()
       .then(data => {
-        setTasks(data);
+        setTasks(data || []);
         setLoading(false);
       })
       .catch(err => {
         console.error("Error fetching tasks:", err);
+        setTasks([]);
         setLoading(false);
       });
   }, []);
@@ -47,7 +48,9 @@ export default function Tasks({ user }: { user: User }) {
   const filteredTasks = tasks.filter(t => {
     const isCategoryMatch = filter === 'all' || t.category === filter;
     const isActive = t.is_active !== 0;
-    return isCategoryMatch && isAvailable(t.available_from) && isActive;
+    const available = isAvailable(t.available_from);
+    const expired = isExpired(t.deadline);
+    return isCategoryMatch && isActive && available && !expired;
   });
 
   const isExpired = (deadline?: string) => {

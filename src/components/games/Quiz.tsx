@@ -14,9 +14,10 @@ export default function Quiz({ user }: { user: User }) {
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [quizFinished, setQuizFinished] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getDailyQuiz()
+    getDailyQuiz(user.id)
       .then(data => {
         if (data && data.length > 0) {
           setQuestions(data);
@@ -25,9 +26,10 @@ export default function Quiz({ user }: { user: User }) {
       })
       .catch(err => {
         console.error("Error fetching quiz:", err);
+        setError(err.message);
         setLoading(false);
       });
-  }, []);
+  }, [user.id]);
 
   const handleAnswer = (option: string) => {
     if (selectedOption || !questions[currentIndex]) return;
@@ -37,7 +39,7 @@ export default function Quiz({ user }: { user: User }) {
     setIsCorrect(correct);
     
     if (correct) {
-      const points = (currentIndex + 1) * 10;
+      const points = 5;
       setScore(prev => prev + points);
     }
 
@@ -63,12 +65,12 @@ export default function Quiz({ user }: { user: User }) {
 
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>;
 
-  if (questions.length === 0) {
+  if (error || questions.length === 0) {
     return (
       <div className="text-center p-12 bg-white rounded-3xl border border-stone-200">
         <Brain className="mx-auto text-stone-300 mb-4" size={48} />
-        <h3 className="text-xl font-bold text-stone-900 mb-2">Sem perguntas hoje</h3>
-        <p className="text-stone-500 mb-6">Volte mais tarde para um novo desafio!</p>
+        <h3 className="text-xl font-bold text-stone-900 mb-2">{error || 'Sem perguntas hoje'}</h3>
+        <p className="text-stone-500 mb-6">{error ? 'Você pode voltar amanhã para um novo desafio.' : 'Volte mais tarde para um novo desafio!'}</p>
         <button 
           onClick={() => navigate('/games')}
           className="px-6 py-3 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition-colors"

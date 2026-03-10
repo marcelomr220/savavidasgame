@@ -60,7 +60,7 @@ export default function Attendance({ user }: { user: User }) {
         <p className="text-stone-500">Use o QR Code do evento ou digite o código de 6 dígitos.</p>
       </header>
 
-      <div className="max-w-md mx-auto space-y-6">
+      <div className="w-full max-w-2xl mx-auto space-y-6">
         {/* Status Message */}
         {status && (
           <div className={`p-4 rounded-2xl flex items-center gap-3 border ${

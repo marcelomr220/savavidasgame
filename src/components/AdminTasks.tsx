@@ -21,7 +21,6 @@ import {
 import { UserTask, Task } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPendingTasks, getTasks, verifyTask, createTask, updateTask, deleteTask } from '../services/api';
-import { supabase } from '../lib/supabase';
 
 export default function AdminTasks() {
   const [activeTab, setActiveTab] = useState<'validation' | 'manage'>('validation');
@@ -184,13 +183,21 @@ export default function AdminTasks() {
       }
 
       try {
-        const { error } = await supabase.from('tasks').insert(tasksToUpload);
+        let successCount = 0;
+        for (const task of tasksToUpload) {
+          try {
+            await createTask(task);
+            successCount++;
+          } catch (e) {
+            console.error("Error uploading task:", task.title, e);
+          }
+        }
 
-        if (!error) {
-          alert(`${tasksToUpload.length} tarefas cadastradas com sucesso!`);
+        if (successCount > 0) {
+          alert(`${successCount} tarefas cadastradas com sucesso!`);
           fetchData();
         } else {
-          alert('Erro no upload: ' + error.message);
+          alert('Erro no upload das tarefas.');
         }
       } catch (err) {
         alert('Erro ao processar arquivo.');

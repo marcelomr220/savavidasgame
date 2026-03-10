@@ -9,7 +9,7 @@ export default function BibleIndex() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getBibleBooks()
+    getBibleBooks(false)
       .then(setBooks)
       .catch(console.error)
       .finally(() => setLoading(false));
