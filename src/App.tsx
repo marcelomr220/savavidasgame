@@ -56,24 +56,29 @@ export default function App() {
 
   useEffect(() => {
     const initApp = async () => {
-      // Fetch app settings (logo)
       try {
+        // Fetch app settings (logo)
         const logo = await getAppSettings('login_logo');
         if (logo) setAppLogo(logo);
+
+        // Check auth
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch (e) {
+            console.error("Error parsing saved user:", e);
+            localStorage.removeItem('user');
+          }
+        }
       } catch (e) {
-        console.error("Error loading app settings:", e);
+        console.error("Error initializing app:", e);
+      } finally {
+        // Simulate a minimum splash screen time for better UX
+        setTimeout(() => {
+          setIsAppLoading(false);
+        }, 1500);
       }
-
-      // Check auth
-      const savedUser = localStorage.getItem('user');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
-
-      // Simulate a minimum splash screen time for better UX
-      setTimeout(() => {
-        setIsAppLoading(false);
-      }, 1500);
     };
 
     initApp();
