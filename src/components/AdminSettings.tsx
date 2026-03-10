@@ -69,7 +69,7 @@ export default function AdminSettings() {
           <section className="space-y-6">
             <h3 className="font-bold text-stone-900 flex items-center gap-2">
               <Image size={20} className="text-red-600" />
-              Logo da Tela de Login
+              Logo do Aplicativo
             </h3>
             
             <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -96,6 +96,7 @@ export default function AdminSettings() {
                     className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
                   />
                 </div>
+                <p className="text-xs text-stone-400">Esta logo será exibida na tela de abertura (Splash Screen) e na tela de Login.</p>
                 <p className="text-xs text-stone-400">Recomendado: Imagem quadrada (PNG ou SVG) com fundo transparente ou sólido.</p>
               </div>
             </div>

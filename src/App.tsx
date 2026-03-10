@@ -15,11 +15,13 @@ import {
   TreeDeciduous,
   Menu,
   X,
-  Book
+  Book,
+  Loader2
 } from 'lucide-react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User } from './types';
+import { getAppSettings } from './services/api';
 
 // Components
 import Dashboard from './components/Dashboard';
@@ -47,14 +49,34 @@ import BottomNavigation from './components/BottomNavigation';
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [appLogo, setAppLogo] = useState<string | null>(null);
+  const [isAppLoading, setIsAppLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    const initApp = async () => {
+      // Fetch app settings (logo)
+      try {
+        const logo = await getAppSettings('login_logo');
+        if (logo) setAppLogo(logo);
+      } catch (e) {
+        console.error("Error loading app settings:", e);
+      }
+
+      // Check auth
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+
+      // Simulate a minimum splash screen time for better UX
+      setTimeout(() => {
+        setIsAppLoading(false);
+      }, 1500);
+    };
+
+    initApp();
   }, []);
 
   const handleLogin = (userData: User) => {
@@ -73,6 +95,34 @@ export default function App() {
     localStorage.removeItem('user');
     navigate('/login');
   };
+
+  if (isAppLoading) {
+    return (
+      <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center"
+        >
+          {appLogo ? (
+            <div className="w-32 h-32 mx-auto mb-6 overflow-hidden rounded-[2.5rem] shadow-2xl border-4 border-white/10">
+              <img src={appLogo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            </div>
+          ) : (
+            <div className="w-24 h-24 bg-red-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-red-900/50 mx-auto mb-6">
+              <Star size={48} fill="currentColor" />
+            </div>
+          )}
+          <h1 className="text-4xl font-black text-white tracking-tighter mb-2">SALVA VIDAS</h1>
+          <div className="flex items-center justify-center gap-2 text-stone-400 font-medium">
+            <Loader2 size={18} className="animate-spin text-red-500" />
+            <span>Carregando o Reino...</span>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (!user && location.pathname !== '/login') {
     return <Login onLogin={handleLogin} />;
