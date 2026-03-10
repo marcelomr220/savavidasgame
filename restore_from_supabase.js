@@ -33,6 +33,8 @@ async function restore() {
     "app_settings",
     "bible_books",
     "bible_chapters",
+    "game_plays",
+    "user_bible_readings",
   ];
 
   for (const table of tables) {
