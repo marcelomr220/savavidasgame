@@ -11,10 +11,59 @@ export default function Tasks({ user }: { user: User }) {
   const [completing, setCompleting] = useState<number | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
+  const isAvailable = (available_from?: string) => {
+    if (!available_from) return true;
+    try {
+      const date = new Date(available_from);
+      if (isNaN(date.getTime())) return true;
+      return date <= new Date();
+    } catch (e) {
+      return true;
+    }
+  };
+
+  const isExpired = (deadline?: string) => {
+    if (!deadline) return false;
+    try {
+      const date = new Date(deadline);
+      if (isNaN(date.getTime())) return false;
+      return date < new Date();
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Sem data';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Data inválida';
+      return date.toLocaleString();
+    } catch (e) {
+      return 'Data inválida';
+    }
+  };
+
+  const formatDateShort = (dateStr?: string) => {
+    if (!dateStr) return 'Sem data';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Data inválida';
+      return date.toLocaleDateString();
+    } catch (e) {
+      return 'Data inválida';
+    }
+  };
+
   useEffect(() => {
     getTasks()
       .then(data => {
-        setTasks(data || []);
+        if (Array.isArray(data)) {
+          setTasks(data);
+        } else {
+          console.error("Tasks data is not an array:", data);
+          setTasks([]);
+        }
         setLoading(false);
       })
       .catch(err => {
@@ -38,41 +87,15 @@ export default function Tasks({ user }: { user: User }) {
 
   const categories = ['all', 'Culto', 'Célula', 'Especial', 'Desafio'];
 
-  const isAvailable = (available_from?: string) => {
-    if (!available_from) return true;
-    const date = new Date(available_from);
-    if (isNaN(date.getTime())) return true; // Treat invalid date as available
-    return date <= new Date();
-  };
-
-  const filteredTasks = tasks.filter(t => {
+  const filteredTasks = Array.isArray(tasks) ? tasks.filter(t => {
+    if (!t || typeof t !== 'object') return false;
     const isCategoryMatch = filter === 'all' || t.category === filter;
-    const isActive = t.is_active !== 0;
+    // Handle both boolean (Supabase) and number (SQLite)
+    const isActive = t.is_active === true || (t.is_active as any) === 1 || (t.is_active as any) === 'true';
     const available = isAvailable(t.available_from);
     const expired = isExpired(t.deadline);
     return isCategoryMatch && isActive && available && !expired;
-  });
-
-  const isExpired = (deadline?: string) => {
-    if (!deadline) return false;
-    const date = new Date(deadline);
-    if (isNaN(date.getTime())) return false;
-    return date < new Date();
-  };
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return 'Sem data';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 'Data inválida';
-    return date.toLocaleString();
-  };
-
-  const formatDateShort = (dateStr?: string) => {
-    if (!dateStr) return 'Sem data';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 'Data inválida';
-    return date.toLocaleDateString();
-  };
+  }) : [];
 
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>;
 

@@ -29,11 +29,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     getAdminStats()
-      .then(data => setStats(data))
+      .then(data => setStats(data || { totalUsers: 0, activeTeams: 0, pendingTasks: 0, monthlyAttendance: 0 }))
       .catch(err => console.error("Error fetching stats:", err));
 
     getRecentActivities()
-      .then(data => setActivities(data))
+      .then(data => setActivities(Array.isArray(data) ? data : []))
       .catch(err => console.error("Error fetching activities:", err));
   }, []);
 

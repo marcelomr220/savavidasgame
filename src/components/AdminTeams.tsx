@@ -27,9 +27,10 @@ export default function AdminTeams() {
   const fetchTeams = async () => {
     try {
       const data = await getTeams();
-      setTeams(data);
+      setTeams(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching teams:", err);
+      setTeams([]);
     } finally {
       setLoading(false);
     }
@@ -38,9 +39,10 @@ export default function AdminTeams() {
   const fetchUsers = async () => {
     try {
       const data = await getUsers();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching users:", err);
+      setUsers([]);
     }
   };
 
