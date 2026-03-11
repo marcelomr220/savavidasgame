@@ -79,15 +79,25 @@ export default function AdminTasks() {
 
   const safeFormatDate = (dateStr?: string) => {
     if (!dateStr) return 'Sem data';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 'Data inválida';
-    return date.toLocaleDateString();
+    try {
+      const normalizedDate = dateStr.includes(' ') && !dateStr.includes('T') 
+        ? dateStr.replace(' ', 'T') 
+        : dateStr;
+      const date = new Date(normalizedDate);
+      if (isNaN(date.getTime())) return 'Data inválida';
+      return date.toLocaleDateString();
+    } catch (e) {
+      return 'Data inválida';
+    }
   };
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr);
+      const normalizedDate = dateStr.includes(' ') && !dateStr.includes('T') 
+        ? dateStr.replace(' ', 'T') 
+        : dateStr;
+      const date = new Date(normalizedDate);
       if (isNaN(date.getTime())) return '';
       return date.toISOString().slice(0, 16);
     } catch (e) {

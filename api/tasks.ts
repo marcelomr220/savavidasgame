@@ -11,17 +11,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { data: tasks, error } = await supabase
           .from('tasks')
           .select('*')
-          .eq('is_active', true)
           .order('created_at', { ascending: false });
         
-        if (!error && tasks) {
-          return res.json(tasks);
+        if (error) {
+          console.error("Supabase error fetching tasks:", error);
+        } else if (tasks && tasks.length > 0) {
+          // Filter active tasks for the user view
+          const activeTasks = tasks.filter((t: any) => t.is_active === true || t.is_active === 1 || t.is_active === 'true');
+          return res.json(activeTasks);
         }
       }
       
       if (db) {
-        const tasks = db.prepare("SELECT * FROM tasks WHERE is_active = 1 ORDER BY created_at DESC").all();
-        return res.json(tasks);
+        try {
+          const tasks = db.prepare("SELECT * FROM tasks WHERE is_active = 1 ORDER BY created_at DESC").all();
+          return res.json(tasks);
+        } catch (e) {
+          console.error("SQLite error fetching tasks:", e);
+        }
       }
       
       return res.json([]);

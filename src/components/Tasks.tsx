@@ -14,7 +14,11 @@ export default function Tasks({ user }: { user: User }) {
   const isAvailable = (available_from?: string) => {
     if (!available_from) return true;
     try {
-      const date = new Date(available_from);
+      // Normalize date string for better browser compatibility (replace space with T)
+      const normalizedDate = available_from.includes(' ') && !available_from.includes('T') 
+        ? available_from.replace(' ', 'T') 
+        : available_from;
+      const date = new Date(normalizedDate);
       if (isNaN(date.getTime())) return true;
       return date <= new Date();
     } catch (e) {
@@ -25,7 +29,10 @@ export default function Tasks({ user }: { user: User }) {
   const isExpired = (deadline?: string) => {
     if (!deadline) return false;
     try {
-      const date = new Date(deadline);
+      const normalizedDate = deadline.includes(' ') && !deadline.includes('T') 
+        ? deadline.replace(' ', 'T') 
+        : deadline;
+      const date = new Date(normalizedDate);
       if (isNaN(date.getTime())) return false;
       return date < new Date();
     } catch (e) {
@@ -36,7 +43,10 @@ export default function Tasks({ user }: { user: User }) {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Sem data';
     try {
-      const date = new Date(dateStr);
+      const normalizedDate = dateStr.includes(' ') && !dateStr.includes('T') 
+        ? dateStr.replace(' ', 'T') 
+        : dateStr;
+      const date = new Date(normalizedDate);
       if (isNaN(date.getTime())) return 'Data inválida';
       return date.toLocaleString();
     } catch (e) {
@@ -47,7 +57,10 @@ export default function Tasks({ user }: { user: User }) {
   const formatDateShort = (dateStr?: string) => {
     if (!dateStr) return 'Sem data';
     try {
-      const date = new Date(dateStr);
+      const normalizedDate = dateStr.includes(' ') && !dateStr.includes('T') 
+        ? dateStr.replace(' ', 'T') 
+        : dateStr;
+      const date = new Date(normalizedDate);
       if (isNaN(date.getTime())) return 'Data inválida';
       return date.toLocaleDateString();
     } catch (e) {

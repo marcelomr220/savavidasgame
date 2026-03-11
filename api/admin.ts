@@ -30,7 +30,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .from('user_tasks')
           .select('*, users(name), tasks(title, points)')
           .eq('status', 'pending');
-        if (!error) {
+        if (error) {
+          console.error("Supabase error fetching pending tasks:", error);
+        } else if (data && data.length > 0) {
           const formatted = data.map((d: any) => ({
             ...d,
             user_name: Array.isArray(d.users) ? d.users[0]?.name : d.users?.name,
@@ -41,48 +43,76 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       if (db) {
-        const data = db.prepare("SELECT ut.*, u.name as user_name, t.title as task_title, t.points as task_points FROM user_tasks ut JOIN users u ON ut.user_id = u.id JOIN tasks t ON ut.task_id = t.id WHERE ut.status = 'pending'").all();
-        return res.json(data);
+        try {
+          const data = db.prepare("SELECT ut.*, u.name as user_name, t.title as task_title, t.points as task_points FROM user_tasks ut JOIN users u ON ut.user_id = u.id JOIN tasks t ON ut.task_id = t.id WHERE ut.status = 'pending'").all();
+          return res.json(data);
+        } catch (e) {
+          console.error("SQLite error fetching pending tasks:", e);
+        }
       }
+      return res.json([]);
     }
 
     if (users) {
       if (supabase) {
         const { data, error } = await supabase.from('users').select('*, teams(name)').order('points', { ascending: false });
-        if (!error) {
+        if (error) {
+          console.error("Supabase error fetching admin users:", error);
+        } else if (data && data.length > 0) {
           const formatted = data.map((u: any) => ({ ...u, team_name: Array.isArray(u.teams) ? u.teams[0]?.name : u.teams?.name }));
           return res.json(formatted);
         }
       }
       if (db) {
-        const users = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id ORDER BY u.points DESC").all();
-        return res.json(users);
+        try {
+          const users = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id ORDER BY u.points DESC").all();
+          return res.json(users);
+        } catch (e) {
+          console.error("SQLite error fetching admin users:", e);
+        }
       }
+      return res.json([]);
     }
 
     if (teams) {
       if (supabase) {
         const { data, error } = await supabase.from('teams').select('*, users(count)').order('total_points', { ascending: false });
-        if (!error) {
+        if (error) {
+          console.error("Supabase error fetching admin teams:", error);
+        } else if (data && data.length > 0) {
           const formatted = data.map((t: any) => ({ ...t, member_count: Array.isArray(t.users) ? t.users[0]?.count : t.users?.count || 0 }));
           return res.json(formatted);
         }
       }
       if (db) {
-        const teams = db.prepare("SELECT t.*, (SELECT COUNT(*) FROM users WHERE team_id = t.id) as member_count FROM teams t ORDER BY t.total_points DESC").all();
-        return res.json(teams);
+        try {
+          const teams = db.prepare("SELECT t.*, (SELECT COUNT(*) FROM users WHERE team_id = t.id) as member_count FROM teams t ORDER BY t.total_points DESC").all();
+          return res.json(teams);
+        } catch (e) {
+          console.error("SQLite error fetching admin teams:", e);
+        }
       }
+      return res.json([]);
     }
 
     if (tasks) {
       if (supabase) {
         const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-        if (!error) return res.json(data);
+        if (error) {
+          console.error("Supabase error fetching admin tasks:", error);
+        } else if (data && data.length > 0) {
+          return res.json(data);
+        }
       }
       if (db) {
-        const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
-        return res.json(tasks);
+        try {
+          const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
+          return res.json(tasks);
+        } catch (e) {
+          console.error("SQLite error fetching admin tasks:", e);
+        }
       }
+      return res.json([]);
     }
 
     if (sessions) {
