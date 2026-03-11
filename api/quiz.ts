@@ -6,6 +6,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { daily, submit } = query;
 
   if (method === 'GET' && daily) {
+    if (supabase) {
+      const { data, error } = await supabase.from('biblical_questions').select('*');
+      if (!error && data.length > 0) return res.json(data[Math.floor(Math.random() * data.length)]);
+    }
     if (db) {
       const questions = db.prepare("SELECT * FROM biblical_questions ORDER BY RANDOM() LIMIT 1").all();
       return res.json(questions[0]);

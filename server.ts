@@ -239,9 +239,11 @@ if (db) {
     db.prepare("INSERT INTO teams (name, color, description) VALUES (?, ?, ?)").run("Leões de Judá", "#ef4444", "Equipe forte e corajosa");
     db.prepare("INSERT INTO teams (name, color, description) VALUES (?, ?, ?)").run("Águias do Reino", "#3b82f6", "Visão e renovo");
     
-    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Admin", "admin@church.com", "admin123", "admin", 1);
-    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("João Silva", "joao@church.com", "user123", "user", 1);
-    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Maria Santos", "maria@church.com", "user123", "user", 2);
+    const adminPass = bcrypt.hashSync("admin123", 10);
+    const userPass = bcrypt.hashSync("user123", 10);
+    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Admin", "admin@church.com", adminPass, "admin", 1);
+    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("João Silva", "joao@church.com", userPass, "user", 1);
+    db.prepare("INSERT INTO users (name, email, password, role, team_id) VALUES (?, ?, ?, ?, ?)").run("Maria Santos", "maria@church.com", userPass, "user", 2);
 
     db.prepare("INSERT INTO tasks (title, description, points, category, type) VALUES (?, ?, ?, ?, ?)").run("Ler Salmo 23", "Ler e meditar no Salmo 23", 10, "Desafio", "Individual");
     db.prepare("INSERT INTO tasks (title, description, points, category, type) VALUES (?, ?, ?, ?, ?)").run("Trazer Visitante", "Trazer um novo amigo para a célula", 50, "Célula", "Individual");
@@ -1070,7 +1072,7 @@ async function startServer(app: any) {
     res.json({ success: true });
   });
 
-  app.get("/api/admin/pending-tasks", async (req, res) => {
+  app.get("/api/admin/tasks/pending", async (req, res) => {
     if (supabase) {
       try {
         const { data: pending, error } = await supabase
@@ -1105,8 +1107,9 @@ async function startServer(app: any) {
     res.json(pending);
   });
 
-  app.post("/api/admin/verify-task", async (req, res) => {
-    const { userTaskId, status } = req.body; // status: 'verified' or 'rejected'
+  app.post("/api/admin/tasks/verify/:id", async (req, res) => {
+    const { id: userTaskId } = req.params;
+    const { status } = req.body; // status: 'verified' or 'rejected'
     
     try {
       const userTask = db.prepare("SELECT * FROM user_tasks WHERE id = ?").get(userTaskId);
@@ -1591,147 +1594,6 @@ async function startServer(app: any) {
     res.redirect(logoUrl);
   });
 
-  // --- Tasks API ---
-  app.get("/api/admin/tasks/pending", async (req, res) => {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from('user_tasks')
-          .select('*, tasks(title, points), users(name)')
-          .eq('status', 'pending');
-        
-        if (!error) {
-          const formatted = data.map(d => ({
-            id: d.id,
-            user_id: d.user_id,
-            task_id: d.task_id,
-            status: d.status,
-            proof_url: d.proof_url,
-            user_name: d.users?.name,
-            task_title: d.tasks?.title,
-            points: d.tasks?.points
-          }));
-          return res.json(formatted);
-        }
-      }
-      
-      const pending = db.prepare(`
-        SELECT ut.*, u.name as user_name, t.title as task_title, t.points
-        FROM user_tasks ut
-        JOIN users u ON ut.user_id = u.id
-        JOIN tasks t ON ut.task_id = t.id
-        WHERE ut.status = 'pending'
-      `).all();
-      res.json(pending);
-    } catch (err) {
-      res.status(500).json({ error: "Error fetching pending tasks" });
-    }
-  });
-
-  app.post("/api/admin/tasks/verify/:id", async (req, res) => {
-    const { id } = req.params;
-    const { status, userId, points } = req.body;
-    try {
-      if (db) {
-        db.prepare("UPDATE user_tasks SET status = ? WHERE id = ?").run(status, id);
-        if (status === 'verified') {
-          db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(points, userId);
-        }
-      }
-      if (supabase) {
-        await supabase.from('user_tasks').update({ status }).eq('id', id);
-        if (status === 'verified') {
-          const { data: user } = await supabase.from('users').select('points').eq('id', userId).single();
-          await supabase.from('users').update({ points: (user?.points || 0) + points }).eq('id', userId);
-        }
-      }
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Error verifying task" });
-    }
-  });
-
-  app.get("/api/tasks", async (req, res) => {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-        if (!error) return res.json(data);
-      }
-      const tasks = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC").all();
-      res.json(tasks);
-    } catch (err) {
-      res.status(500).json({ error: "Error fetching tasks" });
-    }
-  });
-
-  app.post("/api/tasks/complete", async (req, res) => {
-    const { userId, taskId, proofUrl } = req.body;
-    try {
-      if (db) {
-        db.prepare("INSERT INTO user_tasks (user_id, task_id, proof_url, status) VALUES (?, ?, ?, ?)").run(userId, taskId, proofUrl, 'pending');
-      }
-      if (supabase) {
-        await supabase.from('user_tasks').insert([{ user_id: userId, task_id: taskId, proof_url: proofUrl, status: 'pending' }]);
-      }
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Error completing task" });
-    }
-  });
-
-  app.post("/api/admin/tasks", async (req, res) => {
-    const taskData = req.body;
-    try {
-      if (db) {
-        const { title, description, points, category, type, is_active, is_recurring, available_from, deadline } = taskData;
-        db.prepare("INSERT INTO tasks (title, description, points, category, type, is_active, is_recurring, available_from, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
-          title, description, points, category, type, is_active || 1, is_recurring, available_from, deadline
-        );
-      }
-      if (supabase) {
-        await supabase.from('tasks').insert([taskData]);
-      }
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Error creating task" });
-    }
-  });
-
-  app.put("/api/admin/tasks/:id", async (req, res) => {
-    const { id } = req.params;
-    const taskData = req.body;
-    try {
-      if (db) {
-        const { title, description, points, category, type, is_active, is_recurring, available_from, deadline } = taskData;
-        db.prepare("UPDATE tasks SET title = ?, description = ?, points = ?, category = ?, type = ?, is_active = ?, is_recurring = ?, available_from = ?, deadline = ? WHERE id = ?").run(
-          title, description, points, category, type, is_active, is_recurring, available_from, deadline, id
-        );
-      }
-      if (supabase) {
-        await supabase.from('tasks').update(taskData).eq('id', id);
-      }
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Error updating task" });
-    }
-  });
-
-  app.delete("/api/admin/tasks/:id", async (req, res) => {
-    const { id } = req.params;
-    try {
-      if (db) {
-        db.prepare("DELETE FROM user_tasks WHERE task_id = ?").run(id);
-        db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
-      }
-      if (supabase) {
-        await supabase.from('user_tasks').delete().eq('task_id', id);
-        await supabase.from('tasks').delete().eq('id', id);
-      }
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Error deleting task" });
-    }
-  });
   app.get("/api/bible/books", async (req, res) => {
     const { isAdmin } = req.query;
     try {

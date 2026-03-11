@@ -35,6 +35,22 @@
       "destination": "/api/tasks.ts?complete=true"
     },
     {
+      "source": "/api/admin/tasks/pending",
+      "destination": "/api/admin.ts?pending=true"
+    },
+    {
+      "source": "/api/admin/tasks/verify/:id",
+      "destination": "/api/admin.ts?verify=true&id=:id"
+    },
+    {
+      "source": "/api/admin/tasks/:id",
+      "destination": "/api/admin.ts?tasks=true&id=:id"
+    },
+    {
+      "source": "/api/admin/tasks",
+      "destination": "/api/admin.ts?tasks=true"
+    },
+    {
       "source": "/api/admin/stats",
       "destination": "/api/admin.ts?stats=true"
     },
@@ -81,6 +97,38 @@
     {
       "source": "/api/attendance/checkin",
       "destination": "/api/attendance.ts?checkin=true"
+    },
+    {
+      "source": "/api/settings/:key",
+      "destination": "/api/settings.ts?key=:key"
+    },
+    {
+      "source": "/api/settings",
+      "destination": "/api/settings.ts"
+    },
+    {
+      "source": "/api/games/plays",
+      "destination": "/api/games.ts?plays=true"
+    },
+    {
+      "source": "/api/games/record-play",
+      "destination": "/api/games.ts?recordPlay=true"
+    },
+    {
+      "source": "/api/bible/books",
+      "destination": "/api/bible.ts?books=true"
+    },
+    {
+      "source": "/api/bible/books/:bookId/chapters",
+      "destination": "/api/bible.ts?chapters=true&bookId=:bookId"
+    },
+    {
+      "source": "/api/bible/chapters/:chapterId/read",
+      "destination": "/api/bible.ts?read=true&chapterId=:chapterId"
+    },
+    {
+      "source": "/api/bible/chapters/:chapterId",
+      "destination": "/api/bible.ts?chapterId=:chapterId"
     },
     {
       "source": "/api/quiz/daily",

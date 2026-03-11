@@ -19,9 +19,10 @@ export default function AdminAttendance() {
     setLoading(true);
     try {
       const data = await getAttendanceSessions();
-      setSessions(data);
+      setSessions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching sessions:", err);
+      setSessions([]);
     } finally {
       setLoading(false);
     }
