@@ -35,6 +35,22 @@
       "destination": "/api/tasks.ts?complete=true"
     },
     {
+      "source": "/api/admin/tasks/pending",
+      "destination": "/api/admin.ts?pending=true"
+    },
+    {
+      "source": "/api/admin/tasks/verify/:id",
+      "destination": "/api/admin.ts?verify=true&id=:id"
+    },
+    {
+      "source": "/api/admin/tasks/:id",
+      "destination": "/api/admin.ts?tasks=true&id=:id"
+    },
+    {
+      "source": "/api/admin/tasks",
+      "destination": "/api/admin.ts?tasks=true"
+    },
+    {
       "source": "/api/admin/stats",
       "destination": "/api/admin.ts?stats=true"
     },

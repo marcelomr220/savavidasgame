@@ -6,14 +6,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { complete } = query;
 
   if (method === 'GET') {
+    if (supabase) {
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      if (!error) return res.json(tasks);
+    }
     if (db) {
-      const tasks = db.prepare("SELECT * FROM tasks WHERE is_active = 1").all();
+      const tasks = db.prepare("SELECT * FROM tasks WHERE is_active = 1 ORDER BY created_at DESC").all();
       return res.json(tasks);
     }
   }
 
   if (method === 'POST' && complete) {
     const { userId, taskId, proofUrl } = req.body;
+    if (supabase) {
+      const { error } = await supabase
+        .from('user_tasks')
+        .insert([{ user_id: userId, task_id: taskId, proof_url: proofUrl, status: 'pending' }]);
+      if (!error) {
+        if (db) db.prepare("INSERT INTO user_tasks (user_id, task_id, proof_url, status) VALUES (?, ?, ?, ?)").run(userId, taskId, proofUrl, 'pending');
+        return res.json({ success: true, message: "Tarefa enviada para verificação!" });
+      }
+    }
     if (db) {
       db.prepare("INSERT INTO user_tasks (user_id, task_id, proof_url, status) VALUES (?, ?, ?, ?)").run(userId, taskId, proofUrl, 'pending');
       return res.json({ success: true, message: "Tarefa enviada para verificação!" });
