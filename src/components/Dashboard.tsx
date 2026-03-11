@@ -43,18 +43,14 @@ export default function Dashboard({ user }: { user: User }) {
       const userTasks = await supabase.from('user_tasks').select('*, tasks(*)').eq('user_id', user.id);
       const userAttendance = await supabase.from('attendances').select('*, attendance_sessions(*)').eq('user_id', user.id);
       
-      if (userTasks.data && Array.isArray(userTasks.data)) {
+      if (userTasks.data) {
         setTasks(userTasks.data);
-        setStats(prev => ({ ...prev, completedTasks: userTasks.data.filter((t: any) => t && t.status === 'verified').length }));
-      } else {
-        setTasks([]);
+        setStats(prev => ({ ...prev, completedTasks: userTasks.data.filter(t => t.status === 'verified').length }));
       }
       
-      if (userAttendance.data && Array.isArray(userAttendance.data)) {
+      if (userAttendance.data) {
         setAttendance(userAttendance.data);
         setStats(prev => ({ ...prev, attendanceCount: userAttendance.data.length }));
-      } else {
-        setAttendance([]);
       }
 
       // Weekly points simulation

@@ -51,15 +51,13 @@ export default function AdminTasks() {
     try {
       if (activeTab === 'validation') {
         const data = await getPendingTasks();
-        setPending(Array.isArray(data) ? data : []);
+        setPending(data);
       } else {
         const data = await getTasks();
-        setTasks(Array.isArray(data) ? data : []);
+        setTasks(data);
       }
     } catch (err) {
       console.error("Error fetching data:", err);
-      setPending([]);
-      setTasks([]);
     } finally {
       setLoading(false);
     }
@@ -79,25 +77,15 @@ export default function AdminTasks() {
 
   const safeFormatDate = (dateStr?: string) => {
     if (!dateStr) return 'Sem data';
-    try {
-      const normalizedDate = dateStr.includes(' ') && !dateStr.includes('T') 
-        ? dateStr.replace(' ', 'T') 
-        : dateStr;
-      const date = new Date(normalizedDate);
-      if (isNaN(date.getTime())) return 'Data inválida';
-      return date.toLocaleDateString();
-    } catch (e) {
-      return 'Data inválida';
-    }
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Data inválida';
+    return date.toLocaleDateString();
   };
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
-      const normalizedDate = dateStr.includes(' ') && !dateStr.includes('T') 
-        ? dateStr.replace(' ', 'T') 
-        : dateStr;
-      const date = new Date(normalizedDate);
+      const date = new Date(dateStr);
       if (isNaN(date.getTime())) return '';
       return date.toISOString().slice(0, 16);
     } catch (e) {
@@ -355,7 +343,7 @@ export default function AdminTasks() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {tasks.filter(t => t && typeof t === 'object').map((task) => (
+            {tasks.map((task) => (
               <div key={task.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm hover:border-red-200 transition-all group">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-2">

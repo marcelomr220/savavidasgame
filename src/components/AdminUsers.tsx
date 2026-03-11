@@ -32,10 +32,9 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     try {
       const data = await getUsers();
-      setUsers(Array.isArray(data) ? data : []);
+      setUsers(data);
     } catch (err) {
       console.error("Error fetching users:", err);
-      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -44,19 +43,16 @@ export default function AdminUsers() {
   const fetchTeams = async () => {
     try {
       const data = await getTeams();
-      setTeams(Array.isArray(data) ? data : []);
+      setTeams(data);
     } catch (err) {
       console.error("Error fetching teams:", err);
-      setTeams([]);
     }
   };
 
-  const filteredUsers = Array.isArray(users) ? users.filter(u => 
-    u && u.name && (
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
-  ) : [];
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleOpenModal = (user?: UserType) => {
     if (user) {

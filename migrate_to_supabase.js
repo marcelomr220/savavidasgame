@@ -30,11 +30,7 @@ async function migrate() {
     'daily_quizzes',
     'tree_types',
     'user_trees',
-    'app_settings',
-    'bible_books',
-    'bible_chapters',
-    'game_plays',
-    'user_bible_readings'
+    'app_settings'
   ];
 
   for (const table of tables) {

@@ -13,19 +13,18 @@ export default function IndividualRanking({ user }: { user: User }) {
   useEffect(() => {
     getUsers()
       .then(data => {
-        setRankings(Array.isArray(data) ? data : []);
+        setRankings(data);
         setLoading(false);
       })
       .catch(err => {
         console.error("Error fetching rankings:", err);
-        setRankings([]);
         setLoading(false);
       });
   }, []);
 
-  const filteredRankings = Array.isArray(rankings) ? rankings.filter(u => 
-    u && u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
+  const filteredRankings = rankings.filter(u => 
+    u.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const top3 = filteredRankings.slice(0, 3);
   const others = filteredRankings.slice(3);

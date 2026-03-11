@@ -228,13 +228,13 @@ export default function App() {
                 <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-on-primary-container font-bold">
-                  {user?.name?.charAt(0) || 'U'}
+                  {user?.name.charAt(0)}
                 </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-on-surface truncate">{user?.name || 'Usuário'}</p>
-              <p className="text-xs text-on-surface-variant truncate">Nível {user?.level || 1}</p>
+              <p className="text-sm font-semibold text-on-surface truncate">{user?.name}</p>
+              <p className="text-xs text-on-surface-variant truncate">Nível {user?.level}</p>
             </div>
           </div>
           <button

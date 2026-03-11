@@ -14,12 +14,11 @@ export default function Teams({ user }: { user: User }) {
   useEffect(() => {
     getTeams()
       .then(data => {
-        setTeams(Array.isArray(data) ? data : []);
+        setTeams(data);
         setLoading(false);
       })
       .catch(err => {
         console.error("Error fetching teams:", err);
-        setTeams([]);
         setLoading(false);
       });
   }, []);
