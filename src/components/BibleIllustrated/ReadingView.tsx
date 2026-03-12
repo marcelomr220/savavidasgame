@@ -95,20 +95,38 @@ export default function ReadingView({ user }: { user: User }) {
         <div className="w-20" /> {/* Spacer */}
       </nav>
 
-      {/* Content */}
-      <div className="max-w-3xl mx-auto pt-32 pb-40 px-6 space-y-24">
-        {chapter.title && (
+      {/* Hero Section with Book Cover */}
+      <div className="relative h-[40vh] md:h-[60vh] overflow-hidden">
+        <img 
+          src={chapter.bible_books?.image_url || `https://picsum.photos/seed/${chapter.bible_books?.name}/1200/800`}
+          alt={chapter.bible_books?.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-4 mb-32"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1 }}
           >
-            <h1 className="text-4xl md:text-6xl font-serif font-bold text-white leading-tight">
-              {chapter.title}
+            <h2 className="text-xs font-bold uppercase tracking-[0.5em] text-[#D4AF37] mb-2">
+              {chapter.bible_books?.name}
+            </h2>
+            <h1 className="text-5xl md:text-7xl font-serif font-bold text-white drop-shadow-2xl">
+              Capítulo {chapter.chapter_number}
             </h1>
-            <div className="w-24 h-1 bg-[#D4AF37] mx-auto rounded-full" />
+            {chapter.title && (
+              <p className="text-xl md:text-2xl text-stone-300 italic font-serif mt-4 drop-shadow-lg">
+                {chapter.title}
+              </p>
+            )}
           </motion.div>
-        )}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-3xl mx-auto pt-20 pb-40 px-6 space-y-24">
 
         {blocks.map((block: any, index: number) => (
           <motion.div

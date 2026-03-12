@@ -52,16 +52,25 @@ export default function ChapterList() {
 
   return (
     <div className="space-y-8 pb-12">
-      <header className="flex items-center gap-4">
-        <button 
-          onClick={() => navigate('/bible')}
-          className="p-2 rounded-full hover:bg-stone-100 transition-colors"
-        >
-          <ChevronLeft size={24} />
-        </button>
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-stone-900">{book.name}</h1>
-          <p className="text-stone-500">Selecione um capítulo para iniciar a leitura ilustrada.</p>
+      <header className="relative h-64 md:h-80 rounded-3xl overflow-hidden mb-8 shadow-xl">
+        <img 
+          src={book.image_url || `https://picsum.photos/seed/${book.name}/1200/400`} 
+          alt={book.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+        <div className="absolute bottom-0 left-0 p-8 flex items-end gap-6 w-full">
+          <button 
+            onClick={() => navigate('/bible')}
+            className="p-3 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-all shadow-lg"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <div className="flex-1">
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">{book.name}</h1>
+            <p className="text-stone-300 font-medium">Selecione um capítulo para iniciar a leitura ilustrada.</p>
+          </div>
         </div>
       </header>
 

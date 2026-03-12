@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Edit2, Trash2, Book, Loader2, ChevronRight, Image as ImageIcon, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getBooks, getBookChapters, deleteBibleChapter, toggleVisibility } from '../../services/api';
+import { getBooks, getBookChapters, deleteBibleChapter, toggleVisibility, updateBookCover, uploadBookCover } from '../../services/api';
 
 export default function AdminBible() {
   const navigate = useNavigate();
@@ -11,6 +11,8 @@ export default function AdminBible() {
   const [chapters, setChapters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingChapters, setLoadingChapters] = useState(false);
+  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<any>(null);
 
   const loadBooks = async () => {
     try {
@@ -57,6 +59,22 @@ export default function AdminBible() {
     }
   };
 
+  const handleEditCover = (book: any) => {
+    setEditingBook(book);
+    setIsCoverModalOpen(true);
+  };
+
+  const handleCoverUpdate = async (imageUrl: string) => {
+    if (!editingBook) return;
+    try {
+      await updateBookCover(editingBook.id, imageUrl);
+      await loadBooks();
+      setIsCoverModalOpen(false);
+    } catch (err) {
+      alert('Erro ao atualizar capa do livro');
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-red-600" /></div>;
 
   return (
@@ -90,26 +108,46 @@ export default function AdminBible() {
                     : 'text-stone-600 hover:bg-stone-50'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-3">
-                    <Book size={18} />
-                    <span>{book.name}</span>
+                <div className="flex items-center gap-2 flex-1">
+                  <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                    <div className="w-8 h-10 bg-stone-100 rounded-md overflow-hidden flex-shrink-0 border border-stone-200">
+                      {book.image_url ? (
+                        <img src={book.image_url} alt={book.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-stone-300">
+                          <Book size={16} />
+                        </div>
+                      )}
+                    </div>
+                    <span className="truncate">{book.name}</span>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleVisibility(book.id, book.visible);
-                    }}
-                    className={`p-1.5 rounded-lg transition-all ${
-                      book.visible 
-                        ? 'text-green-600 hover:bg-green-50' 
-                        : 'text-stone-400 hover:bg-stone-100'
-                    }`}
-                    title={book.visible ? 'Livro Liberado' : 'Livro Oculto'}
-                  >
-                    {book.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                  </button>
-                  <ChevronRight size={16} className={selectedBookId === book.id ? 'opacity-100' : 'opacity-0'} />
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditCover(book);
+                      }}
+                      className="p-1.5 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                      title="Editar Capa"
+                    >
+                      <ImageIcon size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleVisibility(book.id, book.visible);
+                      }}
+                      className={`p-1.5 rounded-lg transition-all ${
+                        book.visible 
+                          ? 'text-green-600 hover:bg-green-50' 
+                          : 'text-stone-400 hover:bg-stone-100'
+                      }`}
+                      title={book.visible ? 'Livro Liberado' : 'Livro Oculto'}
+                    >
+                      {book.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                  </div>
+                  <ChevronRight size={16} className={selectedBookId === book.id ? 'opacity-100' : 'opacity-0 flex-shrink-0'} />
                 </div>
               </button>
             ))}
@@ -167,6 +205,122 @@ export default function AdminBible() {
           </div>
         </main>
       </div>
+
+      <BookCoverModal 
+        isOpen={isCoverModalOpen}
+        onClose={() => setIsCoverModalOpen(false)}
+        book={editingBook}
+        onUpdate={handleCoverUpdate}
+      />
+    </div>
+  );
+}
+
+function BookCoverModal({ isOpen, onClose, book, onUpdate }: any) {
+  const [url, setUrl] = useState(book?.image_url || '');
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(book?.image_url || '');
+
+  useEffect(() => {
+    setUrl(book?.image_url || '');
+    setPreview(book?.image_url || '');
+  }, [book, isOpen]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validation
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert('Formato inválido. Use JPG, PNG ou WEBP.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Arquivo muito grande. Limite de 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const publicUrl = await uploadBookCover(book.id, file);
+      setUrl(publicUrl);
+      setPreview(publicUrl);
+    } catch (err) {
+      alert('Erro no upload');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+      >
+        <h3 className="text-xl font-bold text-stone-900 mb-6">Capa de {book?.name}</h3>
+        
+        <div className="space-y-6">
+          <div className="aspect-[3/4] bg-stone-100 rounded-2xl overflow-hidden border-2 border-dashed border-stone-200 flex items-center justify-center relative">
+            {preview ? (
+              <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon className="text-stone-300" size={48} />
+            )}
+            {uploading && (
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                <Loader2 className="animate-spin text-red-600" />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-stone-700 mb-2">Upload de Imagem</label>
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={handleFileChange}
+                className="w-full text-sm text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+              />
+            </div>
+
+            <div className="relative">
+              <label className="block text-sm font-bold text-stone-700 mb-2">Ou URL da Imagem</label>
+              <input 
+                type="text"
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  setPreview(e.target.value);
+                }}
+                placeholder="https://exemplo.com/imagem.jpg"
+                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button 
+              onClick={onClose}
+              className="flex-1 py-3 text-stone-600 font-bold hover:bg-stone-50 rounded-xl transition-all"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={() => onUpdate(url)}
+              disabled={uploading}
+              className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 shadow-lg shadow-red-100"
+            >
+              Salvar Capa
+            </button>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

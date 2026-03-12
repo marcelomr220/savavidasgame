@@ -767,6 +767,34 @@ export async function uploadBibleImage(file: File) {
   return data.publicUrl;
 }
 
+export async function updateBookCover(bookId: number, imageUrl: string) {
+  const { error } = await supabase
+    .from('bible_books')
+    .update({ image_url: imageUrl })
+    .eq('id', bookId);
+  
+  if (error) throw error;
+  return { success: true };
+}
+
+export async function uploadBookCover(bookId: number, file: File) {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${bookId}-${Date.now()}.${fileExt}`;
+  const filePath = `books/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('bible-images')
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage
+    .from('bible-images')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+
 export async function markChapterAsRead(chapterId: number, userId: number) {
   const { error } = await supabase
     .from('user_bible_readings')
