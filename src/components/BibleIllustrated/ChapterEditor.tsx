@@ -37,19 +37,20 @@ export default function ChapterEditor() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const booksData = await getBibleBooks();
+        const booksData = await getBibleBooks(false);
         setBooks(booksData);
-        if (booksData.length > 0) setBookId(booksData[0].id);
-
+        
         if (id) {
           const chapter = await getChapter(Number(id));
           setBookId(chapter.book_id);
           setChapterNumber(chapter.chapter_number);
           setTitle(chapter.title || '');
           setBlocks(chapter.content.map((b: any, i: number) => ({ ...b, id: `block-${i}` })));
+        } else if (booksData.length > 0) {
+          setBookId(booksData[0].id);
         }
       } catch (err) {
-        console.error(err);
+        console.error("Error fetching data in ChapterEditor:", err);
       } finally {
         setLoading(false);
       }

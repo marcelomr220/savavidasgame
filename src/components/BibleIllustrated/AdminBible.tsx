@@ -42,10 +42,10 @@ export default function AdminBible() {
     }
   };
 
-  const handleToggleRelease = async (bookId: number, currentStatus: number) => {
+  const handleToggleRelease = async (bookId: number, currentVisible: boolean) => {
     try {
-      await toggleBookRelease(bookId, currentStatus === 0);
-      setBooks(books.map(b => b.id === bookId ? { ...b, is_released: currentStatus === 0 ? 1 : 0 } : b));
+      await toggleBookRelease(bookId, !currentVisible);
+      setBooks(books.map(b => b.id === bookId ? { ...b, visible: !currentVisible } : b));
     } catch (err) {
       alert('Erro ao atualizar status do livro');
     }
@@ -92,16 +92,16 @@ export default function AdminBible() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleRelease(book.id, book.is_released);
+                      handleToggleRelease(book.id, book.visible);
                     }}
                     className={`p-1.5 rounded-lg transition-all ${
-                      book.is_released === 1 
+                      book.visible 
                         ? 'text-green-600 hover:bg-green-50' 
                         : 'text-stone-400 hover:bg-stone-100'
                     }`}
-                    title={book.is_released === 1 ? 'Livro Liberado' : 'Livro Oculto'}
+                    title={book.visible ? 'Livro Liberado' : 'Livro Oculto'}
                   >
-                    {book.is_released === 1 ? <Eye size={16} /> : <EyeOff size={16} />}
+                    {book.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
                   <ChevronRight size={16} className={selectedBookId === book.id ? 'opacity-100' : 'opacity-0'} />
                 </div>

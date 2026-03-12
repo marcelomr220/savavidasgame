@@ -633,18 +633,18 @@ export async function getBibleBooks(isAdmin: boolean = false) {
   let query = supabase.from('bible_books').select('*').order('order_index', { ascending: true });
   
   if (!isAdmin) {
-    query = query.eq('is_released', true);
+    query = query.eq('visible', true);
   }
   
   const { data, error } = await query;
   if (error) throw error;
-  return data;
+  return data || [];
 }
 
-export async function toggleBookRelease(bookId: number, isReleased: boolean) {
+export async function toggleBookRelease(bookId: number, visible: boolean) {
   const { error } = await supabase
     .from('bible_books')
-    .update({ is_released: isReleased })
+    .update({ visible: visible })
     .eq('id', bookId);
   
   if (error) throw error;
