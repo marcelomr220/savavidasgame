@@ -2,8 +2,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Cormorant Garamond", serif;
+  --font-sans: "Comic Sans MS", "Comic Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Comic Sans MS", "Comic Sans", "Cormorant Garamond", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
   --radius-xs: 4px;

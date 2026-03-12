@@ -46,12 +46,12 @@ export default function BibleIndex() {
           <Link key={book.id} to={`/bible/book/${book.id}`}>
             <motion.div
               whileHover={{ y: -5 }}
-              className="group relative h-64 rounded-3xl overflow-hidden shadow-lg cursor-pointer"
+              className="group relative aspect-[3/4] rounded-3xl overflow-hidden shadow-lg cursor-pointer bg-black"
             >
               <img
                 src={book.image_url || `https://picsum.photos/seed/${book.name}/600/800`}
                 alt={book.name}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                className="absolute inset-0 w-full h-full object-contain p-1 transition-transform duration-500 group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />

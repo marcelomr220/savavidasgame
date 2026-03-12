@@ -80,44 +80,38 @@ export default function ReadingView({ user }: { user: User }) {
       />
 
       {/* Header */}
-      <nav className="fixed top-0 left-0 right-0 p-6 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent z-50">
+      <nav className="fixed top-0 left-0 right-0 p-4 flex items-center justify-between bg-black/90 backdrop-blur-md border-b border-white/5 z-[100]">
         <button 
           onClick={() => navigate(`/bible/book/${chapter.book_id}`)}
           className="flex items-center gap-2 text-stone-400 hover:text-white transition-colors group"
         >
-          <ChevronLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="text-xs font-bold uppercase tracking-widest">Voltar</span>
+          <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest">Voltar</span>
         </button>
         <div className="text-center">
-          <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4AF37]">{chapter.bible_books?.name}</h2>
-          <p className="font-serif text-lg italic">Capítulo {chapter.chapter_number}</p>
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.4em] text-[#D4AF37] leading-none mb-1">{chapter.bible_books?.name}</h2>
+          <p className="font-serif text-sm italic text-stone-300 leading-none">Capítulo {chapter.chapter_number}</p>
         </div>
-        <div className="w-20" /> {/* Spacer */}
+        <div className="w-10 sm:w-20" /> {/* Spacer */}
       </nav>
 
-      {/* Hero Section with Book Cover */}
-      <div className="relative h-[40vh] md:h-[60vh] overflow-hidden">
-        <img 
-          src={chapter.bible_books?.image_url || `https://picsum.photos/seed/${chapter.bible_books?.name}/1200/800`}
-          alt={chapter.bible_books?.name}
-          className="absolute inset-0 w-full h-full object-cover"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
+      {/* Hero Section with Black Background */}
+      <div className="relative h-[50vh] flex flex-col items-center justify-center bg-black border-b border-white/5">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black" />
+        <div className="relative z-10 text-center p-6 space-y-4">
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1 }}
+            transition={{ duration: 1.2 }}
           >
-            <h2 className="text-xs font-bold uppercase tracking-[0.5em] text-[#D4AF37] mb-2">
+            <h2 className="text-xs font-bold uppercase tracking-[0.6em] text-[#D4AF37] mb-4 opacity-80">
               {chapter.bible_books?.name}
             </h2>
-            <h1 className="text-5xl md:text-7xl font-serif font-bold text-white drop-shadow-2xl">
+            <h1 className="text-6xl md:text-8xl font-serif font-bold text-white tracking-tight">
               Capítulo {chapter.chapter_number}
             </h1>
             {chapter.title && (
-              <p className="text-xl md:text-2xl text-stone-300 italic font-serif mt-4 drop-shadow-lg">
+              <p className="text-xl md:text-3xl text-stone-400 italic font-serif mt-6 max-w-2xl mx-auto leading-relaxed">
                 {chapter.title}
               </p>
             )}
