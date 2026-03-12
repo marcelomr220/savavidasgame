@@ -127,7 +127,8 @@ CREATE TABLE bible_books (
   name TEXT NOT NULL,
   image_url TEXT,
   order_index INTEGER DEFAULT 0,
-  is_released INTEGER DEFAULT 0
+  visible BOOLEAN DEFAULT TRUE,
+  released BOOLEAN DEFAULT FALSE
 );
 
 -- Bible Chapters Table

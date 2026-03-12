@@ -10,7 +10,7 @@ export default function BibleIndex() {
 
   const loadBooks = async () => {
     try {
-      const data = await getBooks(true); // Only visible for users
+      const data = await getBooks(true); // Only released for users
       setBooks(data);
     } catch (err) {
       console.error(err);
@@ -46,12 +46,12 @@ export default function BibleIndex() {
           <Link key={book.id} to={`/bible/book/${book.id}`}>
             <motion.div
               whileHover={{ y: -5 }}
-              className="group relative aspect-[3/4] rounded-3xl overflow-hidden shadow-lg cursor-pointer bg-black"
+              className="group relative aspect-[3/4] rounded-3xl overflow-hidden shadow-lg cursor-pointer bg-stone-900"
             >
               <img
                 src={book.image_url || `https://picsum.photos/seed/${book.name}/600/800`}
                 alt={book.name}
-                className="absolute inset-0 w-full h-full object-contain p-1 transition-transform duration-500 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />

@@ -150,7 +150,8 @@ try {
       name TEXT NOT NULL,
       image_url TEXT,
       order_index INTEGER DEFAULT 0,
-      is_released INTEGER DEFAULT 0
+      visible INTEGER DEFAULT 1,
+      released INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS bible_chapters (
@@ -183,10 +184,19 @@ try {
     );
   `);
 
-  // Ensure is_released column exists for bible_books
+  // Ensure released column exists for bible_books
   try {
     if (db) {
-      db.prepare("ALTER TABLE bible_books ADD COLUMN is_released INTEGER DEFAULT 0").run();
+      db.prepare("ALTER TABLE bible_books ADD COLUMN released INTEGER DEFAULT 0").run();
+    }
+  } catch (e) {
+    // Column already exists
+  }
+
+  // Ensure visible column exists for bible_books
+  try {
+    if (db) {
+      db.prepare("ALTER TABLE bible_books ADD COLUMN visible INTEGER DEFAULT 1").run();
     }
   } catch (e) {
     // Column already exists

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Edit2, Trash2, Book, Loader2, ChevronRight, Image as ImageIcon, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Book, Loader2, ChevronRight, Image as ImageIcon, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getBooks, getBookChapters, deleteBibleChapter, toggleVisibility, updateBookCover, uploadBookCover } from '../../services/api';
+import { getBooks, getBookChapters, deleteBibleChapter, toggleVisibility, toggleRelease, updateBookCover, uploadBookCover } from '../../services/api';
 
 export default function AdminBible() {
   const navigate = useNavigate();
@@ -55,7 +55,16 @@ export default function AdminBible() {
       await toggleVisibility(bookId, currentVisible);
       await loadBooks();
     } catch (err) {
-      alert('Erro ao atualizar status do livro');
+      alert('Erro ao atualizar visibilidade do livro');
+    }
+  };
+
+  const handleToggleRelease = async (bookId: number, currentReleased: boolean) => {
+    try {
+      await toggleRelease(bookId, currentReleased);
+      await loadBooks();
+    } catch (err) {
+      alert('Erro ao atualizar status de liberação do livro');
     }
   };
 
@@ -142,9 +151,23 @@ export default function AdminBible() {
                           ? 'text-green-600 hover:bg-green-50' 
                           : 'text-stone-400 hover:bg-stone-100'
                       }`}
-                      title={book.visible ? 'Livro Liberado' : 'Livro Oculto'}
+                      title={book.visible ? 'Visível no sistema' : 'Oculto no sistema'}
                     >
                       {book.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleRelease(book.id, book.released);
+                      }}
+                      className={`p-1.5 rounded-lg transition-all ${
+                        book.released 
+                          ? 'text-blue-600 hover:bg-blue-50' 
+                          : 'text-stone-400 hover:bg-stone-100'
+                      }`}
+                      title={book.released ? 'Liberado para usuários' : 'Bloqueado para usuários'}
+                    >
+                      {book.released ? <CheckCircle size={16} /> : <XCircle size={16} />}
                     </button>
                   </div>
                   <ChevronRight size={16} className={selectedBookId === book.id ? 'opacity-100' : 'opacity-0 flex-shrink-0'} />

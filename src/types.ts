@@ -67,3 +67,12 @@ export interface UserTree {
   water_count: number;
   points_per_stage: number;
 }
+
+export interface BibleBook {
+  id: number;
+  name: string;
+  image_url?: string;
+  order_index: number;
+  visible: boolean;
+  released: boolean;
+}

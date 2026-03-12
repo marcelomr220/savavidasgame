@@ -54,7 +54,7 @@ export default function ChapterEditor() {
 
   const loadData = async () => {
     try {
-      const booksData = await getBooks(true);
+      const booksData = await getBooks(false); // Admin sees all books
       setBooks(booksData);
       
       if (id) {

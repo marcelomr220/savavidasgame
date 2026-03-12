@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { User, Team, Task, UserTask, BiblicalQuestion, UserTree } from '../types';
+import { User, Team, Task, UserTask, BiblicalQuestion, UserTree, BibleBook } from '../types';
 import bcrypt from "bcryptjs";
 
 // --- AUTH ---
@@ -629,11 +629,11 @@ export async function updateAppSettings(key: string, value: string) {
 }
 
 // --- BIBLE ILLUSTRATED ---
-export async function getBooks(onlyVisible: boolean = false) {
+export async function getBooks(onlyReleased: boolean = false): Promise<BibleBook[]> {
   let query = supabase.from('bible_books').select('*').order('id', { ascending: true });
   
-  if (onlyVisible) {
-    query = query.eq('visible', true);
+  if (onlyReleased) {
+    query = query.eq('released', true);
   }
   
   const { data, error } = await query;
@@ -648,6 +648,19 @@ export async function toggleVisibility(bookId: number, currentVisible: boolean) 
   const { error } = await supabase
     .from('bible_books')
     .update({ visible: !currentVisible })
+    .eq('id', bookId);
+  
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  return { success: true };
+}
+
+export async function toggleRelease(bookId: number, currentReleased: boolean) {
+  const { error } = await supabase
+    .from('bible_books')
+    .update({ released: !currentReleased })
     .eq('id', bookId);
   
   if (error) {

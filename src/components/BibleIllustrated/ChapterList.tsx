@@ -18,7 +18,7 @@ export default function ChapterList() {
       try {
         const [chaptersData, booksData] = await Promise.all([
           getBookChapters(Number(bookId)),
-          getBooks()
+          getBooks(true)
         ]);
         setChapters(chaptersData);
         setBook(booksData.find((b: any) => b.id === Number(bookId)));
