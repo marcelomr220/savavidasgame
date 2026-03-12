@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, useScroll, useSpring } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Loader2, Star, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { getChapter, markChapterAsRead } from '../../services/api';
+import { getChapter, markChapterAsRead, getChapterContent } from '../../services/api';
 import { User } from '../../types';
 
 export default function ReadingView({ user }: { user: User }) {
   const { chapterId } = useParams();
   const navigate = useNavigate();
   const [chapter, setChapter] = useState<any>(null);
+  const [blocks, setBlocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [readingComplete, setReadingComplete] = useState(false);
@@ -25,10 +26,23 @@ export default function ReadingView({ user }: { user: User }) {
   useEffect(() => {
     if (!chapterId) return;
     setLoading(true);
-    getChapter(Number(chapterId))
-      .then(setChapter)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    
+    const loadData = async () => {
+      try {
+        const chapterData = await getChapter(Number(chapterId));
+        setChapter(chapterData);
+        
+        const content = await getChapterContent(Number(chapterId));
+        setBlocks(content);
+      } catch (err) {
+        console.error(err);
+        setError("Erro ao carregar capítulo");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [chapterId]);
 
   const handleFinishReading = async () => {
@@ -75,19 +89,19 @@ export default function ReadingView({ user }: { user: User }) {
           <span className="text-xs font-bold uppercase tracking-widest">Voltar</span>
         </button>
         <div className="text-center">
-          <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4AF37]">{chapter.book_name}</h2>
+          <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4AF37]">{chapter.bible_books?.name}</h2>
           <p className="font-serif text-lg italic">Capítulo {chapter.chapter_number}</p>
         </div>
         <div className="w-20" /> {/* Spacer */}
       </nav>
 
       {/* Content */}
-      <div className="max-w-3xl mx-auto pt-32 pb-40 px-6 space-y-32">
+      <div className="max-w-3xl mx-auto pt-32 pb-40 px-6 space-y-24">
         {chapter.title && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-4"
+            className="text-center space-y-4 mb-32"
           >
             <h1 className="text-4xl md:text-6xl font-serif font-bold text-white leading-tight">
               {chapter.title}
@@ -96,32 +110,65 @@ export default function ReadingView({ user }: { user: User }) {
           </motion.div>
         )}
 
-        {chapter.content.map((item: any, index: number) => (
+        {blocks.map((block: any, index: number) => (
           <motion.div
-            key={index}
+            key={block.id}
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="space-y-12"
+            className="space-y-8"
           >
-            {item.type === 'image' ? (
-              <div className="relative aspect-[4/5] md:aspect-video rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.1)] border border-white/10">
-                <img 
-                  src={item.value} 
-                  alt="Ilustração Bíblica" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+            {block.block_type === 'verse' && (
+              <div className="space-y-8">
+                <div className="flex items-start gap-4">
+                  <span className="text-[#D4AF37] font-serif text-2xl font-bold opacity-50 mt-1">
+                    {block.bible_verses?.verse_number}
+                  </span>
+                  <p className="text-xl md:text-2xl leading-relaxed text-stone-200 font-light">
+                    {block.bible_verses?.verse_text}
+                  </p>
+                </div>
+                {block.bible_verses?.image_url && (
+                  <div className="relative aspect-video rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.1)] border border-white/10">
+                    <img 
+                      src={block.bible_verses.image_url} 
+                      alt={`Ilustração Versículo ${block.bible_verses.verse_number}`} 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center space-y-6">
-                <div className="w-12 h-[1px] bg-[#D4AF37]/40 mx-auto" />
-                <p className="text-xl md:text-2xl leading-relaxed text-stone-200 font-light">
-                  {item.value}
+            )}
+
+            {block.block_type === 'text' && (
+              <div className="text-center py-8">
+                <div className="w-12 h-[1px] bg-[#D4AF37]/40 mx-auto mb-8" />
+                <p className="text-lg md:text-xl leading-relaxed text-stone-400 italic font-serif">
+                  {block.content_text}
                 </p>
-                <div className="w-12 h-[1px] bg-[#D4AF37]/40 mx-auto" />
+                <div className="w-12 h-[1px] bg-[#D4AF37]/40 mx-auto mt-8" />
+              </div>
+            )}
+
+            {block.block_type === 'image' && (
+              <div className="space-y-4">
+                <div className="relative aspect-video rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.1)] border border-white/10">
+                  <img 
+                    src={block.image_url} 
+                    alt="Ilustração Bíblica" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                </div>
+                {block.content_text && (
+                  <p className="text-center text-xs uppercase tracking-widest text-stone-500 font-bold">
+                    {block.content_text}
+                  </p>
+                )}
               </div>
             )}
           </motion.div>

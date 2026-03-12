@@ -671,20 +671,100 @@ export async function getBookChapters(bookId: number) {
 export async function getChapter(chapterId: number) {
   const { data, error } = await supabase
     .from('bible_chapters')
-    .select('*')
+    .select('*, bible_books(name)')
     .eq('id', chapterId)
     .single();
   
   if (error) throw error;
+  return data;
+}
+
+export async function getChapterContent(chapterId: number) {
+  const { data, error } = await supabase
+    .from('chapter_blocks')
+    .select('*, bible_verses(*)')
+    .eq('chapter_id', chapterId)
+    .order('order_index', { ascending: true });
   
-  if (data.content && typeof data.content === 'string') {
-    try {
-      data.content = JSON.parse(data.content);
-    } catch (e) {
-      // Content might not be JSON
+  if (error) throw error;
+  return data;
+}
+
+export async function saveChapterBlocks(chapterId: number, blocks: any[]) {
+  // 1. Handle bible_verses synchronization for 'verse' blocks
+  const verseBlocks = blocks.filter(b => b.block_type === 'verse');
+  
+  for (const block of verseBlocks) {
+    const verseData = {
+      chapter_id: chapterId,
+      verse_number: block.verse_number,
+      verse_text: block.content_text,
+      image_url: block.image_url
+    };
+
+    if (block.verse_id && !block.id.startsWith('v-')) {
+      // Update existing verse
+      await supabase.from('bible_verses').update(verseData).eq('id', block.verse_id);
+    } else {
+      // Create new verse
+      const { data: newVerse, error: verseError } = await supabase
+        .from('bible_verses')
+        .insert([verseData])
+        .select()
+        .single();
+      
+      if (!verseError && newVerse) {
+        block.verse_id = newVerse.id;
+      }
     }
   }
+
+  // 2. Save chapter_blocks
+  await supabase.from('chapter_blocks').delete().eq('chapter_id', chapterId);
+  
+  if (blocks.length === 0) return true;
+
+  const blocksToInsert = blocks.map((block, index) => ({
+    chapter_id: chapterId,
+    block_type: block.block_type,
+    verse_id: block.verse_id || null,
+    content_text: block.block_type === 'verse' ? null : (block.content_text || null),
+    image_url: block.block_type === 'verse' ? null : (block.image_url || null),
+    order_index: index
+  }));
+
+  const { error } = await supabase.from('chapter_blocks').insert(blocksToInsert);
+  if (error) throw error;
+  return true;
+}
+
+export async function getBibleVerses(chapterId: number) {
+  const { data, error } = await supabase
+    .from('bible_verses')
+    .select('*')
+    .eq('chapter_id', chapterId)
+    .order('verse_number', { ascending: true });
+  
+  if (error) throw error;
   return data;
+}
+
+export async function uploadBibleImage(file: File) {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Math.random()}.${fileExt}`;
+  const filePath = `bible-images/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('bible-images')
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage
+    .from('bible-images')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
 }
 
 export async function markChapterAsRead(chapterId: number, userId: number) {
