@@ -191,61 +191,110 @@ export async function deleteTeam(teamId: number) {
 
 // --- TASKS ---
 export async function getTasks(): Promise<Task[]> {
-  const response = await fetch('/api/tasks');
-  if (!response.ok) return [];
-  return response.json();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('is_active', true)
+    .or(`available_from.is.null,available_from.lte.${now}`)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data as Task[];
 }
 
 export async function getPendingTasks(): Promise<UserTask[]> {
-  const response = await fetch('/api/admin/tasks/pending');
-  if (!response.ok) return [];
-  return response.json();
+  const { data, error } = await supabase
+    .from('user_tasks')
+    .select(`
+      *,
+      users (name),
+      tasks (title, points)
+    `)
+    .eq('status', 'pending');
+  
+  if (error) throw error;
+  
+  return (data || []).map((ut: any) => ({
+    ...ut,
+    user_name: ut.users?.name,
+    task_title: ut.tasks?.title,
+    points: ut.tasks?.points
+  })) as UserTask[];
 }
 
 export async function verifyTask(userTaskId: number, status: 'verified' | 'rejected', userId: number, points: number) {
-  const response = await fetch(`/api/admin/tasks/verify/${userTaskId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status, userId, points })
-  });
-  return response.json();
+  const { error } = await supabase
+    .from('user_tasks')
+    .update({ status, verified_at: new Date().toISOString() })
+    .eq('id', userTaskId);
+  
+  if (error) throw error;
+
+  if (status === 'verified') {
+    // Add points to user
+    const { data: user } = await supabase.from('users').select('points, team_id').eq('id', userId).single();
+    if (user) {
+      const newPoints = (user.points || 0) + points;
+      const newLevel = Math.floor(newPoints / 100) + 1;
+      await supabase.from('users').update({ points: newPoints, level: newLevel }).eq('id', userId);
+      
+      if (user.team_id) {
+        const { data: team } = await supabase.from('teams').select('total_points').eq('id', user.team_id).single();
+        if (team) {
+          await supabase.from('teams').update({ total_points: (team.total_points || 0) + points }).eq('id', user.team_id);
+        }
+      }
+    }
+  }
+  
+  return { success: true };
 }
 
 export async function createTask(taskData: Partial<Task>) {
-  const response = await fetch('/api/admin/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(taskData)
-  });
-  return response.json();
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert([taskData])
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
 }
 
 export async function updateTask(taskId: number, taskData: Partial<Task>) {
-  const response = await fetch(`/api/admin/tasks/${taskId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(taskData)
-  });
-  return response.json();
+  const { error } = await supabase
+    .from('tasks')
+    .update(taskData)
+    .eq('id', taskId);
+  
+  if (error) throw error;
+  return true;
 }
 
 export async function deleteTask(taskId: number) {
-  const response = await fetch(`/api/admin/tasks/${taskId}`, {
-    method: 'DELETE'
-  });
-  return response.json();
+  await supabase.from('user_tasks').delete().eq('task_id', taskId);
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', taskId);
+  
+  if (error) throw error;
+  return true;
 }
 
 export async function completeTask(userId: number, taskId: number, proofUrl: string) {
-  const response = await fetch('/api/tasks/complete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, taskId, proofUrl })
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Erro ao concluir tarefa');
-  }
+  const { error } = await supabase
+    .from('user_tasks')
+    .insert([{ 
+      user_id: userId, 
+      task_id: taskId, 
+      proof_url: proofUrl, 
+      status: 'pending',
+      completed_at: new Date().toISOString()
+    }]);
+  
+  if (error) throw error;
   return true;
 }
 
@@ -379,55 +428,78 @@ export async function checkIn(userId: number, code: string) {
 
 // --- GAMES ---
 export async function getGamePlays(userId: number, gameId: string): Promise<number> {
-  const response = await fetch(`/api/games/plays?userId=${userId}&gameId=${gameId}`);
-  if (!response.ok) return 0;
-  const data = await response.json();
-  return data.count || 0;
+  const { data, error } = await supabase
+    .from('game_plays')
+    .select('count')
+    .eq('user_id', userId)
+    .eq('game_id', gameId)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  return data?.count || 0;
 }
 
 export async function recordGamePlay(userId: number, gameId: string): Promise<number> {
-  const response = await fetch('/api/games/record-play', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, gameId })
-  });
-  if (!response.ok) return 0;
-  const data = await response.json();
-  return data.count || 0;
+  const { data: existing } = await supabase
+    .from('game_plays')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('game_id', gameId)
+    .single();
+  
+  if (existing) {
+    const { data, error } = await supabase
+      .from('game_plays')
+      .update({ count: existing.count + 1 })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data.count;
+  } else {
+    const { data, error } = await supabase
+      .from('game_plays')
+      .insert([{ user_id: userId, game_id: gameId, count: 1 }])
+      .select()
+      .single();
+    if (error) throw error;
+    return data.count;
+  }
 }
 
 // --- QUIZ ---
 export async function getDailyQuiz(userId?: number): Promise<BiblicalQuestion[]> {
-  const url = userId ? `/api/quiz/daily?userId=${userId}` : '/api/quiz/daily';
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      let errorMessage = `Erro ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorMessage;
-      } catch (e) {
-        // Not a JSON response, maybe HTML error page
-      }
-      throw new Error(errorMessage);
-    }
-    return response.json();
-  } catch (err: any) {
-    console.error("Quiz fetch error:", err);
-    throw err;
-  }
+  const { data, error } = await supabase
+    .from('biblical_questions')
+    .select('*')
+    .eq('is_active', true);
+  
+  if (error) throw error;
+  
+  // Shuffle and pick 5
+  const shuffled = (data || []).sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 5) as BiblicalQuestion[];
 }
 
 export async function submitQuiz(userId: number, score: number) {
-  const response = await fetch('/api/quiz/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, score })
-  });
+  const { error } = await supabase
+    .from('daily_quizzes')
+    .insert([{ 
+      user_id: userId, 
+      score, 
+      date: new Date().toISOString().split('T')[0] 
+    }]);
   
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Erro ao enviar quiz');
+  if (error) throw error;
+  
+  // Add points if score > 0
+  if (score > 0) {
+    const { data: user } = await supabase.from('users').select('points').eq('id', userId).single();
+    if (user) {
+      const newPoints = (user.points || 0) + score;
+      const newLevel = Math.floor(newPoints / 100) + 1;
+      await supabase.from('users').update({ points: newPoints, level: newLevel }).eq('id', userId);
+    }
   }
   
   return score;
@@ -538,92 +610,127 @@ export async function waterTree(treeId: number, userId: number) {
 
 // --- APP SETTINGS ---
 export async function getAppSettings(key: string) {
-  try {
-    const response = await fetch(`/api/settings/${key}`);
-    const data = await response.json();
-    return data.value;
-  } catch (err) {
-    console.error("Error fetching settings:", err);
-    return null;
-  }
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', key)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  return data?.value || null;
 }
 
 export async function updateAppSettings(key: string, value: string) {
-  const response = await fetch('/api/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, value })
-  });
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert([{ key, value }]);
   
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Erro ao salvar configurações');
-  }
+  if (error) throw error;
 }
 
 // --- BIBLE ILLUSTRATED ---
 export async function getBibleBooks(isAdmin: boolean = false) {
-  const response = await fetch(`/api/bible/books?isAdmin=${isAdmin}`);
-  return response.json();
+  let query = supabase.from('bible_books').select('*').order('order_index', { ascending: true });
+  
+  if (!isAdmin) {
+    query = query.eq('is_released', true);
+  }
+  
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
 }
 
 export async function toggleBookRelease(bookId: number, isReleased: boolean) {
-  const response = await fetch(`/api/admin/bible/books/${bookId}/release`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ isReleased })
-  });
-  return response.json();
+  const { error } = await supabase
+    .from('bible_books')
+    .update({ is_released: isReleased })
+    .eq('id', bookId);
+  
+  if (error) throw error;
+  return { success: true };
 }
 
 export async function getBookChapters(bookId: number) {
-  const response = await fetch(`/api/bible/books/${bookId}/chapters`);
-  return response.json();
+  const { data, error } = await supabase
+    .from('bible_chapters')
+    .select('id, book_id, chapter_number, title')
+    .eq('book_id', bookId)
+    .order('chapter_number', { ascending: true });
+  
+  if (error) throw error;
+  return data;
 }
 
 export async function getChapter(chapterId: number) {
-  const response = await fetch(`/api/bible/chapters/${chapterId}`);
-  const data = await response.json();
+  const { data, error } = await supabase
+    .from('bible_chapters')
+    .select('*')
+    .eq('id', chapterId)
+    .single();
+  
+  if (error) throw error;
+  
   if (data.content && typeof data.content === 'string') {
-    data.content = JSON.parse(data.content);
+    try {
+      data.content = JSON.parse(data.content);
+    } catch (e) {
+      // Content might not be JSON
+    }
   }
   return data;
 }
 
 export async function markChapterAsRead(chapterId: number, userId: number) {
-  const response = await fetch(`/api/bible/chapters/${chapterId}/read`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId })
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Erro ao registrar leitura');
+  const { error } = await supabase
+    .from('user_bible_readings')
+    .insert([{ 
+      user_id: userId, 
+      chapter_id: chapterId, 
+      read_at: new Date().toISOString(),
+      points_awarded: 5
+    }]);
+  
+  if (error) throw error;
+  
+  // Add points
+  const { data: user } = await supabase.from('users').select('points').eq('id', userId).single();
+  if (user) {
+    const newPoints = (user.points || 0) + 5;
+    const newLevel = Math.floor(newPoints / 100) + 1;
+    await supabase.from('users').update({ points: newPoints, level: newLevel }).eq('id', userId);
   }
-  return response.json();
+  
+  return { success: true, pointsAwarded: 5 };
 }
 
 export async function createBibleChapter(data: any) {
-  const response = await fetch('/api/admin/bible/chapters', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  return response.json();
+  const { data: newChapter, error } = await supabase
+    .from('bible_chapters')
+    .insert([data])
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return newChapter;
 }
 
 export async function updateBibleChapter(id: number, data: any) {
-  const response = await fetch(`/api/admin/bible/chapters/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  return response.json();
+  const { error } = await supabase
+    .from('bible_chapters')
+    .update(data)
+    .eq('id', id);
+  
+  if (error) throw error;
+  return { success: true };
 }
 
 export async function deleteBibleChapter(id: number) {
-  const response = await fetch(`/api/admin/bible/chapters/${id}`, {
-    method: 'DELETE'
-  });
-  return response.json();
+  const { error } = await supabase
+    .from('bible_chapters')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw error;
+  return { success: true };
 }
