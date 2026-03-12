@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
-import { getBibleBooks, getChapter, createBibleChapter, updateBibleChapter } from '../../services/api';
+import { getBooks, getChapter, createBibleChapter, updateBibleChapter } from '../../services/api';
 import { GoogleGenAI } from "@google/genai";
 
 type ContentBlock = {
@@ -34,28 +34,29 @@ export default function ChapterEditor() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const booksData = await getBibleBooks(false);
-        setBooks(booksData);
-        
-        if (id) {
-          const chapter = await getChapter(Number(id));
-          setBookId(chapter.book_id);
-          setChapterNumber(chapter.chapter_number);
-          setTitle(chapter.title || '');
-          setBlocks(chapter.content.map((b: any, i: number) => ({ ...b, id: `block-${i}` })));
-        } else if (booksData.length > 0) {
-          setBookId(booksData[0].id);
-        }
-      } catch (err) {
-        console.error("Error fetching data in ChapterEditor:", err);
-      } finally {
-        setLoading(false);
+  const loadBooks = async () => {
+    try {
+      const booksData = await getBooks(true); // Only visible books for new chapters
+      setBooks(booksData);
+      
+      if (id) {
+        const chapter = await getChapter(Number(id));
+        setBookId(chapter.book_id);
+        setChapterNumber(chapter.chapter_number);
+        setTitle(chapter.title || '');
+        setBlocks(chapter.content.map((b: any, i: number) => ({ ...b, id: `block-${i}` })));
+      } else if (booksData.length > 0) {
+        setBookId(booksData[0].id);
       }
-    };
-    fetchData();
+    } catch (err) {
+      console.error("Error fetching data in ChapterEditor:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBooks();
   }, [id]);
 
   const addBlock = (type: 'text' | 'image') => {

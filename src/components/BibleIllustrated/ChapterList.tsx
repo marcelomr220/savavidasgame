@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Loader2, BookOpen } from 'lucide-react';
-import { getBookChapters, getBibleBooks } from '../../services/api';
+import { getBookChapters, getBooks } from '../../services/api';
 
 export default function ChapterList() {
   const { bookId } = useParams();
@@ -18,7 +18,7 @@ export default function ChapterList() {
       try {
         const [chaptersData, booksData] = await Promise.all([
           getBookChapters(Number(bookId)),
-          getBibleBooks()
+          getBooks()
         ]);
         setChapters(chaptersData);
         setBook(booksData.find((b: any) => b.id === Number(bookId)));

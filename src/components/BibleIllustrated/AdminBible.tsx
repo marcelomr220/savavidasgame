@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Edit2, Trash2, Book, Loader2, ChevronRight, Image as ImageIcon, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getBibleBooks, getBookChapters, deleteBibleChapter, toggleBookRelease } from '../../services/api';
+import { getBooks, getBookChapters, deleteBibleChapter, toggleVisibility } from '../../services/api';
 
 export default function AdminBible() {
   const navigate = useNavigate();
@@ -12,14 +12,20 @@ export default function AdminBible() {
   const [loading, setLoading] = useState(true);
   const [loadingChapters, setLoadingChapters] = useState(false);
 
+  const loadBooks = async () => {
+    try {
+      const data = await getBooks(false); // Admin sees all
+      setBooks(data);
+      if (data.length > 0 && !selectedBookId) setSelectedBookId(data[0].id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    getBibleBooks(true)
-      .then(data => {
-        setBooks(data);
-        if (data.length > 0) setSelectedBookId(data[0].id);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadBooks();
   }, []);
 
   useEffect(() => {
@@ -42,10 +48,10 @@ export default function AdminBible() {
     }
   };
 
-  const handleToggleRelease = async (bookId: number, currentVisible: boolean) => {
+  const handleToggleVisibility = async (bookId: number, currentVisible: boolean) => {
     try {
-      await toggleBookRelease(bookId, !currentVisible);
-      setBooks(books.map(b => b.id === bookId ? { ...b, visible: !currentVisible } : b));
+      await toggleVisibility(bookId, currentVisible);
+      await loadBooks();
     } catch (err) {
       alert('Erro ao atualizar status do livro');
     }
@@ -92,7 +98,7 @@ export default function AdminBible() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleRelease(book.id, book.visible);
+                      handleToggleVisibility(book.id, book.visible);
                     }}
                     className={`p-1.5 rounded-lg transition-all ${
                       book.visible 

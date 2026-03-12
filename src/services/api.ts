@@ -629,25 +629,31 @@ export async function updateAppSettings(key: string, value: string) {
 }
 
 // --- BIBLE ILLUSTRATED ---
-export async function getBibleBooks(isAdmin: boolean = false) {
-  let query = supabase.from('bible_books').select('*').order('order_index', { ascending: true });
+export async function getBooks(onlyVisible: boolean = false) {
+  let query = supabase.from('bible_books').select('*').order('id', { ascending: true });
   
-  if (!isAdmin) {
+  if (onlyVisible) {
     query = query.eq('visible', true);
   }
   
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    console.error(error);
+    return [];
+  }
   return data || [];
 }
 
-export async function toggleBookRelease(bookId: number, visible: boolean) {
+export async function toggleVisibility(bookId: number, currentVisible: boolean) {
   const { error } = await supabase
     .from('bible_books')
-    .update({ visible: visible })
+    .update({ visible: !currentVisible })
     .eq('id', bookId);
   
-  if (error) throw error;
+  if (error) {
+    console.error(error);
+    throw error;
+  }
   return { success: true };
 }
 

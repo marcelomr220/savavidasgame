@@ -2,17 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Book, ChevronRight, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getBibleBooks } from '../../services/api';
+import { getBooks } from '../../services/api';
 
 export default function BibleIndex() {
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadBooks = async () => {
+    try {
+      const data = await getBooks(true); // Only visible for users
+      setBooks(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    getBibleBooks(false)
-      .then(setBooks)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadBooks();
   }, []);
 
   if (loading) {
