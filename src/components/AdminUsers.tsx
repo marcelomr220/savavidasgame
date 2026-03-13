@@ -21,7 +21,8 @@ export default function AdminUsers() {
     team_id: '',
     points: 0,
     level: 1,
-    streak: 0
+    streak: 0,
+    birth_date: ''
   });
 
   useEffect(() => {
@@ -69,7 +70,8 @@ export default function AdminUsers() {
         team_id: user.team_id?.toString() || '',
         points: user.points,
         level: user.level,
-        streak: user.streak
+        streak: user.streak,
+        birth_date: user.birth_date || ''
       });
     } else {
       setEditingUser(null);
@@ -81,7 +83,8 @@ export default function AdminUsers() {
         team_id: '',
         points: 0,
         level: 1,
-        streak: 0
+        streak: 0,
+        birth_date: ''
       });
     }
     setIsModalOpen(true);
@@ -341,6 +344,15 @@ export default function AdminUsers() {
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-bold text-stone-700 mb-1">Data de Nascimento</label>
+                    <input
+                      type="date"
+                      value={formData.birth_date}
+                      onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
                       className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
                     />
                   </div>

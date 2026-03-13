@@ -37,13 +37,12 @@ import AdminAttendance from './components/AdminAttendance';
 import AdminTeams from './components/AdminTeams';
 import AdminUsers from './components/AdminUsers';
 import AdminSettings from './components/AdminSettings';
+import BirthdayAdmin from './components/BirthdayAdmin';
 import BibleIndex from './components/BibleIllustrated/BibleIndex';
 import ChapterList from './components/BibleIllustrated/ChapterList';
 import ReadingView from './components/BibleIllustrated/ReadingView';
 import AdminBible from './components/BibleIllustrated/AdminBible';
 import ChapterEditor from './components/BibleIllustrated/ChapterEditor';
-import AIGenerator from './components/BibleIllustrated/AIGenerator';
-import VisualTemplateGenerator from './components/BibleIllustrated/VisualTemplateGenerator';
 import Login from './components/Login';
 
 import BottomNavigation from './components/BottomNavigation';
@@ -284,8 +283,7 @@ export default function App() {
                     <Route path="/admin/bible" element={<AdminBible />} />
                     <Route path="/admin/bible/new" element={<ChapterEditor />} />
                     <Route path="/admin/bible/edit/:id" element={<ChapterEditor />} />
-                    <Route path="/admin/bible/ai-generator" element={<AIGenerator />} />
-                    <Route path="/admin/bible/visual-generator" element={<VisualTemplateGenerator />} />
+                    <Route path="/admin/birthdays" element={<BirthdayAdmin />} />
                   </>
                 )}
               </Routes>

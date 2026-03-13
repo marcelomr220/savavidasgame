@@ -24,6 +24,18 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
+// Helper function to calculate age
+function calculateAge(birthDate: string): number {
+  const birth = new Date(birthDate);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 // Initialize Database
 try {
   if (db) {
@@ -50,6 +62,7 @@ try {
       level INTEGER DEFAULT 1,
       streak INTEGER DEFAULT 0,
       role TEXT DEFAULT 'user',
+      birth_date TEXT,
       last_login DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (team_id) REFERENCES teams (id)
@@ -182,6 +195,26 @@ try {
       FOREIGN KEY (user_id) REFERENCES users (id),
       FOREIGN KEY (chapter_id) REFERENCES bible_chapters (id)
     );
+
+    CREATE TABLE IF NOT EXISTS birthday_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      birthday_user_id INTEGER,
+      sender_user_id INTEGER,
+      message TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (birthday_user_id) REFERENCES users (id),
+      FOREIGN KEY (sender_user_id) REFERENCES users (id)
+    );
+
+    CREATE TABLE IF NOT EXISTS birthday_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      admin_message TEXT,
+      image_url TEXT,
+      year INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    );
   `);
 
   // Ensure released column exists for bible_books
@@ -201,6 +234,90 @@ try {
   } catch (e) {
     // Column already exists
   }
+
+  // Ensure birth_date column exists for users
+  try {
+    if (db) {
+      db.prepare("ALTER TABLE users ADD COLUMN birth_date TEXT").run();
+    }
+  } catch (e) {
+    // Column already exists
+  }
+
+  // Daily Birthday Check
+  async function checkBirthdays() {
+    console.log("Checking for birthdays...");
+    const today = new Date();
+    const day = today.getDate();
+    const month = today.getMonth() + 1;
+    const year = today.getFullYear();
+
+    try {
+      let birthdayUsers: any[] = [];
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*');
+        
+        if (error) throw error;
+        
+        birthdayUsers = data.filter(user => {
+          if (!user.birth_date) return false;
+          const bDate = new Date(user.birth_date);
+          return bDate.getUTCDate() === day && (bDate.getUTCMonth() + 1) === month;
+        });
+      } else if (db) {
+        const users = db.prepare("SELECT * FROM users WHERE birth_date IS NOT NULL").all();
+        birthdayUsers = users.filter((user: any) => {
+          const bDate = new Date(user.birth_date);
+          return bDate.getUTCDate() === day && (bDate.getUTCMonth() + 1) === month;
+        });
+      }
+
+      for (const user of birthdayUsers) {
+        // Check if point already awarded this year
+        let alreadyAwarded = false;
+        if (supabase) {
+          const { data } = await supabase
+            .from('birthday_events')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('year', year);
+          alreadyAwarded = data && data.length > 0;
+        } else if (db) {
+          const event = db.prepare("SELECT * FROM birthday_events WHERE user_id = ? AND year = ?").get(user.id, year);
+          alreadyAwarded = !!event;
+        }
+
+        if (!alreadyAwarded) {
+          console.log(`Awarding birthday points to ${user.name}`);
+          // Award 100 points
+          if (supabase) {
+            await supabase.rpc('increment_user_points', { row_id: user.id, amount: 100 });
+            await supabase.from('birthday_events').insert({
+              user_id: user.id,
+              year: year,
+              admin_message: `Parabéns pelos seus ${calculateAge(user.birth_date)} anos!`,
+            });
+          } else if (db) {
+            db.prepare("UPDATE users SET points = points + 100 WHERE id = ?").run(user.id);
+            db.prepare("INSERT INTO birthday_events (user_id, year, admin_message) VALUES (?, ?, ?)").run(
+              user.id,
+              year,
+              `Parabéns pelos seus ${calculateAge(user.birth_date)} anos!`
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking birthdays:", error);
+    }
+  }
+
+  // Run check every 24 hours
+  setInterval(checkBirthdays, 24 * 60 * 60 * 1000);
+  // Run once on startup
+  checkBirthdays();
 
   // Ensure title column exists for existing tables
   try {
@@ -682,7 +799,7 @@ async function startServer(app: any) {
   });
 
   app.put("/api/admin/users/:id", async (req, res) => {
-    const { name, email, password, role, team_id, points, level, streak } = req.body;
+    const { name, email, password, role, team_id, points, level, streak, birth_date } = req.body;
     const userId = req.params.id;
     try {
       let hashedPassword = password;
@@ -694,20 +811,20 @@ async function startServer(app: any) {
       if (password) {
         db.prepare(`
           UPDATE users 
-          SET name = ?, email = ?, password = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ? 
+          SET name = ?, email = ?, password = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ?, birth_date = ? 
           WHERE id = ?
-        `).run(name, email, hashedPassword, role, team_id, points, level, streak, userId);
+        `).run(name, email, hashedPassword, role, team_id, points, level, streak, birth_date, userId);
       } else {
         db.prepare(`
           UPDATE users 
-          SET name = ?, email = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ? 
+          SET name = ?, email = ?, role = ?, team_id = ?, points = ?, level = ?, streak = ?, birth_date = ? 
           WHERE id = ?
-        `).run(name, email, role, team_id, points, level, streak, userId);
+        `).run(name, email, role, team_id, points, level, streak, birth_date, userId);
       }
 
       // Attempt Supabase update if configured
       if (supabase) {
-        const updateData: any = { name, email, role, team_id, points, level, streak };
+        const updateData: any = { name, email, role, team_id, points, level, streak, birth_date };
         if (password) updateData.password = hashedPassword;
         
         try {
@@ -1799,6 +1916,152 @@ async function startServer(app: any) {
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Error deleting chapter" });
+    }
+  });
+
+  // Birthday Endpoints
+  app.get("/api/birthdays", async (req, res) => {
+    const today = new Date();
+    const day = today.getDate();
+    const month = today.getMonth() + 1;
+    const year = today.getFullYear();
+
+    try {
+      let users: any[] = [];
+      if (supabase) {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) throw error;
+        users = data;
+      } else if (db) {
+        users = db.prepare("SELECT * FROM users").all();
+      }
+
+      const birthdayUsers = users.filter(user => {
+        if (!user.birth_date) return false;
+        const bDate = new Date(user.birth_date);
+        return bDate.getUTCDate() === day && (bDate.getUTCMonth() + 1) === month;
+      });
+
+      const results = await Promise.all(birthdayUsers.map(async (user) => {
+        let event = null;
+        let messages = [];
+
+        if (supabase) {
+          const { data: eventData } = await supabase
+            .from('birthday_events')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('year', year)
+            .maybeSingle();
+          event = eventData;
+
+          const { data: msgData } = await supabase
+            .from('birthday_messages')
+            .select('*, sender:users(name, avatar)')
+            .eq('birthday_user_id', user.id)
+            .order('created_at', { ascending: false });
+          messages = msgData || [];
+        } else if (db) {
+          event = db.prepare("SELECT * FROM birthday_events WHERE user_id = ? AND year = ?").get(user.id, year);
+          messages = db.prepare(`
+            SELECT m.*, u.name as sender_name, u.avatar as sender_avatar 
+            FROM birthday_messages m 
+            JOIN users u ON m.sender_user_id = u.id 
+            WHERE m.birthday_user_id = ? 
+            ORDER BY m.created_at DESC
+          `).all(user.id);
+        }
+
+        return {
+          ...user,
+          age: calculateAge(user.birth_date),
+          event,
+          messages
+        };
+      }));
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching birthdays:", error);
+      res.status(500).json({ error: "Failed to fetch birthdays" });
+    }
+  });
+
+  app.post("/api/birthdays/:userId/messages", async (req, res) => {
+    const { userId } = req.params;
+    const { senderId, message } = req.body;
+
+    try {
+      if (supabase) {
+        await supabase.from('birthday_messages').insert({
+          birthday_user_id: userId,
+          sender_user_id: senderId,
+          message
+        });
+        // Award 3 points to sender
+        await addPoints(senderId, 3);
+      } else if (db) {
+        db.prepare("INSERT INTO birthday_messages (birthday_user_id, sender_user_id, message) VALUES (?, ?, ?)").run(
+          userId,
+          senderId,
+          message
+        );
+        await addPoints(senderId, 3);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error sending birthday message:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  app.post("/api/admin/birthdays", async (req, res) => {
+    const { userId, adminMessage, imageUrl } = req.body;
+    const year = new Date().getFullYear();
+
+    try {
+      if (supabase) {
+        const { data: existing } = await supabase
+          .from('birthday_events')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('year', year)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from('birthday_events').update({
+            admin_message: adminMessage,
+            image_url: imageUrl
+          }).eq('id', existing.id);
+        } else {
+          await supabase.from('birthday_events').insert({
+            user_id: userId,
+            admin_message: adminMessage,
+            image_url: imageUrl,
+            year
+          });
+        }
+      } else if (db) {
+        const existing = db.prepare("SELECT * FROM birthday_events WHERE user_id = ? AND year = ?").get(userId, year);
+        if (existing) {
+          db.prepare("UPDATE birthday_events SET admin_message = ?, image_url = ? WHERE id = ?").run(
+            adminMessage,
+            imageUrl,
+            existing.id
+          );
+        } else {
+          db.prepare("INSERT INTO birthday_events (user_id, admin_message, image_url, year) VALUES (?, ?, ?, ?)").run(
+            userId,
+            adminMessage,
+            imageUrl,
+            year
+          );
+        }
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating birthday event:", error);
+      res.status(500).json({ error: "Failed to update birthday event" });
     }
   });
 

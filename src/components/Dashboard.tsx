@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { User } from '../types';
+import { User, BirthdayMessage } from '../types';
 import { supabase } from '../lib/supabase';
+import BirthdayCard from './BirthdayCard';
 
 export default function Dashboard({ user }: { user: User }) {
   const [stats, setStats] = useState({
@@ -31,10 +32,39 @@ export default function Dashboard({ user }: { user: User }) {
   const [attendance, setAttendance] = useState<any[]>([]);
   const [xpHistory, setXpHistory] = useState<any[]>([]);
   const [teamInfo, setTeamInfo] = useState<any>(null);
+  const [birthdays, setBirthdays] = useState<any[]>([]);
 
   useEffect(() => {
     fetchStats();
+    fetchBirthdays();
   }, [user.id]);
+
+  const fetchBirthdays = async () => {
+    try {
+      const response = await fetch('/api/birthdays');
+      if (response.ok) {
+        const data = await response.json();
+        setBirthdays(data);
+      }
+    } catch (error) {
+      console.error("Error fetching birthdays:", error);
+    }
+  };
+
+  const handleSendBirthdayMessage = async (userId: number, message: string) => {
+    try {
+      const response = await fetch(`/api/birthdays/${userId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderId: user.id, message })
+      });
+      if (response.ok) {
+        fetchBirthdays(); // Refresh messages
+      }
+    } catch (error) {
+      console.error("Error sending birthday message:", error);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -79,6 +109,17 @@ export default function Dashboard({ user }: { user: User }) {
         <h2 className="text-2xl font-bold text-on-surface">Olá, {user.name}! 👋</h2>
         <p className="text-on-surface-variant">Que bom ter você aqui hoje.</p>
       </header>
+
+      {/* Birthday Celebration */}
+      {birthdays.map((bUser: any) => (
+        <div key={bUser.id}>
+          <BirthdayCard 
+            birthdayUser={bUser}
+            currentUser={user}
+            onSendMessage={handleSendBirthdayMessage}
+          />
+        </div>
+      ))}
 
       {/* Level Progress Card */}
       <section className="m3-card-filled p-6 overflow-hidden relative">

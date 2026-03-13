@@ -9,6 +9,26 @@ export interface User {
   level: number;
   streak: number;
   role: 'user' | 'admin';
+  birth_date?: string;
+}
+
+export interface BirthdayMessage {
+  id: number;
+  birthday_user_id: number;
+  sender_user_id: number;
+  sender_name?: string;
+  sender_avatar?: string;
+  message: string;
+  created_at: string;
+}
+
+export interface BirthdayEvent {
+  id: number;
+  user_id: number;
+  admin_message?: string;
+  image_url?: string;
+  year: number;
+  created_at: string;
 }
 
 export interface Team {
