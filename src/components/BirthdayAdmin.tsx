@@ -18,6 +18,28 @@ export default function BirthdayAdmin() {
     fetchUsers();
   }, []);
 
+  useEffect(() => {
+    if (selectedUser) {
+      fetchSettings(selectedUser.id);
+    } else {
+      setAdminMessage('');
+      setImageUrl('');
+    }
+  }, [selectedUser]);
+
+  const fetchSettings = async (userId: number) => {
+    try {
+      const response = await fetch(`/api/admin/birthdays/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAdminMessage(data.admin_message || '');
+        setImageUrl(data.image_url || '');
+      }
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+    }
+  };
+
   const fetchUsers = async () => {
     try {
       const data = await getUsers();

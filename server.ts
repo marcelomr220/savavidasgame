@@ -1960,7 +1960,11 @@ async function startServer(app: any) {
             .select('*, sender:users(name, avatar)')
             .eq('birthday_user_id', user.id)
             .order('created_at', { ascending: false });
-          messages = msgData || [];
+          messages = (msgData || []).map((m: any) => ({
+            ...m,
+            sender_name: m.sender?.name,
+            sender_avatar: m.sender?.avatar
+          }));
         } else if (db) {
           event = db.prepare("SELECT * FROM birthday_events WHERE user_id = ? AND year = ?").get(user.id, year);
           messages = db.prepare(`
@@ -2012,6 +2016,30 @@ async function startServer(app: any) {
     } catch (error) {
       console.error("Error sending birthday message:", error);
       res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/admin/birthdays/:userId", async (req, res) => {
+    const { userId } = req.params;
+    const year = new Date().getFullYear();
+
+    try {
+      let event = null;
+      if (supabase) {
+        const { data } = await supabase
+          .from('birthday_events')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('year', year)
+          .maybeSingle();
+        event = data;
+      } else if (db) {
+        event = db.prepare("SELECT * FROM birthday_events WHERE user_id = ? AND year = ?").get(userId, year);
+      }
+      res.json(event || {});
+    } catch (error) {
+      console.error("Error fetching birthday settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
 
