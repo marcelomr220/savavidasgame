@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
+import multer from "multer";
 
 dotenv.config();
 
@@ -40,6 +41,12 @@ function calculateAge(birthDate: string): number {
 try {
   if (db) {
     db.exec(`
+    CREATE TABLE IF NOT EXISTS mascot_levels (
+      level INTEGER PRIMARY KEY,
+      gif_url TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS teams (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -64,6 +71,7 @@ try {
       role TEXT DEFAULT 'user',
       birth_date TEXT,
       last_login DATETIME,
+      last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (team_id) REFERENCES teams (id)
     );
@@ -217,6 +225,11 @@ try {
     );
   `);
 
+  // Migration: Add last_activity_at if it doesn't exist
+  try {
+    db.prepare("ALTER TABLE users ADD COLUMN last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP").run();
+  } catch (e) {}
+
   // Ensure released column exists for bible_books
   try {
     if (db) {
@@ -334,12 +347,13 @@ try {
 
 // Helper for adding points to user and team
 async function addPoints(userId: any, amount: number) {
-  if (amount <= 0) return;
+  if (amount === 0) return;
   
   try {
+    const now = new Date().toISOString();
     // Update SQLite if available
     if (db) {
-      db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(amount, userId);
+      db.prepare("UPDATE users SET points = points + ?, last_activity_at = ? WHERE id = ?").run(amount, now, userId);
       const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userId);
       if (user && user.team_id) {
         db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(amount, user.team_id);
@@ -349,6 +363,7 @@ async function addPoints(userId: any, amount: number) {
     // Update Supabase
     if (supabase) {
       await supabase.rpc('increment_user_points', { row_id: userId, amount });
+      await supabase.from('users').update({ last_activity_at: now }).eq('id', userId);
       const { data: userData } = await supabase.from('users').select('team_id').eq('id', userId).single();
       if (userData?.team_id) {
         await supabase.rpc('increment_team_points', { row_id: userData.team_id, amount });
@@ -358,6 +373,51 @@ async function addPoints(userId: any, amount: number) {
     console.error("Error adding points:", err);
   }
 }
+
+// XP Decay Job - Runs once a day
+async function runXPDecay() {
+  console.log("Running XP Decay job...");
+  try {
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const threeDaysAgoStr = threeDaysAgo.toISOString();
+
+    if (db) {
+      // Find users inactive for more than 3 days
+      const inactiveUsers = db.prepare("SELECT id, points FROM users WHERE last_activity_at < ? AND points > 0").all(threeDaysAgoStr);
+      for (const user of inactiveUsers) {
+        const decayAmount = 100;
+        const newPoints = Math.max(0, user.points - decayAmount);
+        db.prepare("UPDATE users SET points = ? WHERE id = ?").run(newPoints, user.id);
+        console.log(`Decayed XP for user ${user.id}: ${user.points} -> ${newPoints}`);
+      }
+    }
+
+    if (supabase) {
+      const { data: inactiveUsers } = await supabase
+        .from('users')
+        .select('id, points')
+        .lt('last_activity_at', threeDaysAgoStr)
+        .gt('points', 0);
+
+      if (inactiveUsers) {
+        for (const user of inactiveUsers) {
+          const decayAmount = 100;
+          const newPoints = Math.max(0, user.points - decayAmount);
+          await supabase.from('users').update({ points: newPoints }).eq('id', user.id);
+          console.log(`Decayed XP (Supabase) for user ${user.id}: ${user.points} -> ${newPoints}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in XP Decay job:", error);
+  }
+}
+
+// Schedule XP Decay to run every 24 hours
+setInterval(runXPDecay, 24 * 60 * 60 * 1000);
+// Also run it once on startup after a short delay
+setTimeout(runXPDecay, 10000);
 
 // Seed initial data if empty
 if (db) {
@@ -399,6 +459,88 @@ async function startServer(app: any) {
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
   // --- API Routes ---
+  // Mascot Levels Endpoints
+  app.get("/api/mascot/level/:level", async (req, res) => {
+    const level = parseInt(req.params.level);
+    if (isNaN(level)) return res.status(400).json({ error: "Nível inválido" });
+
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from('mascot_levels').select('*').eq('level', level).maybeSingle();
+        if (data) return res.json(data);
+      }
+      if (db) {
+        const data = db.prepare("SELECT * FROM mascot_levels WHERE level = ?").get(level);
+        if (data) return res.json(data);
+      }
+      res.json({ level, gif_url: null });
+    } catch (err) {
+      res.status(500).json({ error: "Erro ao buscar nível do mascote" });
+    }
+  });
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'image/gif') {
+        cb(null, true);
+      } else {
+        cb(new Error('Apenas arquivos GIF são permitidos'));
+      }
+    }
+  });
+
+  app.post("/api/admin/mascot/upload", upload.single('file'), async (req, res) => {
+    const level = parseInt(req.body.level);
+    const file = req.file;
+
+    if (isNaN(level) || level < 1 || level > 50) {
+      return res.status(400).json({ error: "Nível deve estar entre 1 e 50" });
+    }
+    if (!file) {
+      return res.status(400).json({ error: "Arquivo não enviado" });
+    }
+
+    try {
+      let gifUrl = "";
+
+      if (supabase) {
+        const fileName = `level-${level}.gif`;
+        const { data, error } = await supabase.storage
+          .from('mascot')
+          .upload(fileName, file.buffer, {
+            contentType: 'image/gif',
+            upsert: true
+          });
+
+        if (error) {
+          // If bucket doesn't exist, try to create it or just report error
+          // In a real app we'd ensure bucket exists.
+          console.error("Supabase Storage error:", error);
+          throw error;
+        }
+
+        const { data: { publicUrl } } = supabase.storage.from('mascot').getPublicUrl(fileName);
+        gifUrl = publicUrl;
+
+        await supabase.from('mascot_levels').upsert({ level, gif_url: gifUrl });
+      }
+
+      if (db) {
+        if (!gifUrl) {
+          gifUrl = `data:image/gif;base64,${file.buffer.toString('base64')}`;
+        }
+        db.prepare("INSERT INTO mascot_levels (level, gif_url) VALUES (?, ?) ON CONFLICT(level) DO UPDATE SET gif_url = excluded.gif_url").run(level, gifUrl);
+      }
+
+      res.json({ success: true, gif_url: gifUrl });
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: err.message || "Erro ao realizar upload" });
+    }
+  });
+
   app.get("/api/supabase/status", async (req, res) => {
     let testResult = null;
     if (supabase) {

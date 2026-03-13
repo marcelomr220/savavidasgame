@@ -99,7 +99,7 @@ export default function Profile({ user, onUpdateUser }: { user: User, onUpdateUs
                 </button>
               </div>
               <div className="absolute -bottom-2 -left-2 w-8 h-8 rounded-full bg-red-600 border-4 border-white flex items-center justify-center text-white text-xs font-bold">
-                {user.level}
+                {Math.floor(user.points / 500) + 1}
               </div>
             </div>
             <div className="flex gap-2">

@@ -11,7 +11,8 @@ import {
   Database,
   Settings,
   Book,
-  Cake
+  Cake,
+  Flame
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -83,6 +84,7 @@ export default function AdminDashboard() {
             <AdminLink to="/admin/teams" icon={Users} title="Equipes" desc="Gerenciar times e líderes" />
             <AdminLink to="/admin/users" icon={UserCheck} title="Usuários" desc="Controle de acesso e pontos" />
             <AdminLink to="/admin/birthdays" icon={Cake} title="Aniversários" desc="Configurar mensagens e imagens" />
+            <AdminLink to="/admin/mascot" icon={Flame} title="Mascote" desc="Upload de GIFs por nível" />
             <AdminLink to="/admin/bible" icon={Book} title="Bíblia Ilustrada" desc="Cadastrar capítulos e imagens" />
             <AdminLink to="/admin/settings" icon={Settings} title="Configurações" desc="Personalizar logo e aparência" />
           </div>

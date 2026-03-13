@@ -38,6 +38,7 @@ import AdminTeams from './components/AdminTeams';
 import AdminUsers from './components/AdminUsers';
 import AdminSettings from './components/AdminSettings';
 import BirthdayAdmin from './components/BirthdayAdmin';
+import MascotAdmin from './components/MascotAdmin';
 import BibleIndex from './components/BibleIllustrated/BibleIndex';
 import ChapterList from './components/BibleIllustrated/ChapterList';
 import ReadingView from './components/BibleIllustrated/ReadingView';
@@ -284,6 +285,7 @@ export default function App() {
                     <Route path="/admin/bible/new" element={<ChapterEditor />} />
                     <Route path="/admin/bible/edit/:id" element={<ChapterEditor />} />
                     <Route path="/admin/birthdays" element={<BirthdayAdmin />} />
+                    <Route path="/admin/mascot" element={<MascotAdmin />} />
                   </>
                 )}
               </Routes>
