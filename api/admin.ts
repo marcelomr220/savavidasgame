@@ -4,9 +4,21 @@ import bcrypt from "bcryptjs";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { method, query } = req;
-  const { id, stats, pending, verify, users, teams, tasks, sessions, recent } = query;
+  const { id, stats, pending, verify, users, teams, tasks, sessions, recent, birthdays } = query;
 
   if (method === 'GET') {
+    if (birthdays && id) {
+      const year = new Date().getFullYear();
+      if (supabase) {
+        const { data } = await supabase.from('birthday_events').select('*').eq('user_id', id).eq('year', year).maybeSingle();
+        return res.json(data || {});
+      }
+      if (db) {
+        const event = db.prepare("SELECT * FROM birthday_events WHERE user_id = ? AND year = ?").get(id, year);
+        return res.json(event || {});
+      }
+    }
+
     if (stats) {
       if (supabase) {
         const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
@@ -197,6 +209,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!supabase) lastId = result.lastInsertRowid;
       }
       return res.json({ id: lastId });
+    }
+
+    if (birthdays) {
+      const { userId, adminMessage, imageUrl } = req.body;
+      const year = new Date().getFullYear();
+      if (supabase) {
+        const { data: existing } = await supabase.from('birthday_events').select('*').eq('user_id', userId).eq('year', year).maybeSingle();
+        if (existing) {
+          await supabase.from('birthday_events').update({ admin_message: adminMessage, image_url: imageUrl }).eq('id', existing.id);
+        } else {
+          await supabase.from('birthday_events').insert({ user_id: userId, admin_message: adminMessage, image_url: imageUrl, year });
+        }
+      }
+      if (db) {
+        const existing = db.prepare("SELECT * FROM birthday_events WHERE user_id = ? AND year = ?").get(userId, year);
+        if (existing) {
+          db.prepare("UPDATE birthday_events SET admin_message = ?, image_url = ? WHERE id = ?").run(adminMessage, imageUrl, existing.id);
+        } else {
+          db.prepare("INSERT INTO birthday_events (user_id, admin_message, image_url, year) VALUES (?, ?, ?, ?)").run(userId, adminMessage, imageUrl, year);
+        }
+      }
+      return res.json({ success: true });
     }
   }
 

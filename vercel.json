@@ -79,6 +79,14 @@
       "destination": "/api/admin.ts?users=true"
     },
     {
+      "source": "/api/admin/birthdays/:id",
+      "destination": "/api/admin.ts?birthdays=true&id=:id"
+    },
+    {
+      "source": "/api/admin/birthdays",
+      "destination": "/api/admin.ts?birthdays=true"
+    },
+    {
       "source": "/api/admin/teams/:id",
       "destination": "/api/admin.ts?id=:id&teams=true"
     },
@@ -93,6 +101,14 @@
     {
       "source": "/api/admin/tasks",
       "destination": "/api/admin.ts?tasks=true"
+    },
+    {
+      "source": "/api/birthdays/:userId/messages",
+      "destination": "/api/birthdays.ts?userId=:userId&messages=true"
+    },
+    {
+      "source": "/api/birthdays",
+      "destination": "/api/birthdays.ts"
     },
     {
       "source": "/api/attendance/checkin",
