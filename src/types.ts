@@ -10,7 +10,6 @@ export interface User {
   streak: number;
   role: 'user' | 'admin';
   birth_date?: string;
-  last_activity_at?: string;
 }
 
 export interface BirthdayMessage {

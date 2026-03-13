@@ -19,7 +19,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { User, BirthdayMessage } from '../types';
 import { supabase } from '../lib/supabase';
-import { getMascotLevel } from '../services/api';
 import BirthdayCard from './BirthdayCard';
 
 export default function Dashboard({ user }: { user: User }) {
@@ -34,24 +33,11 @@ export default function Dashboard({ user }: { user: User }) {
   const [xpHistory, setXpHistory] = useState<any[]>([]);
   const [teamInfo, setTeamInfo] = useState<any>(null);
   const [birthdays, setBirthdays] = useState<any[]>([]);
-  const [mascotGif, setMascotGif] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
     fetchBirthdays();
-    fetchMascotGif();
-  }, [user.id, user.points]);
-
-  const fetchMascotGif = async () => {
-    try {
-      const calculatedLevel = Math.floor(user.points / 500) + 1;
-      const mascotLevel = Math.min(calculatedLevel, 50);
-      const data = await getMascotLevel(mascotLevel);
-      setMascotGif(data.gif_url);
-    } catch (error) {
-      console.error("Error fetching mascot gif:", error);
-    }
-  };
+  }, [user.id]);
 
   const fetchBirthdays = async () => {
     try {
@@ -113,11 +99,8 @@ export default function Dashboard({ user }: { user: User }) {
     }
   };
 
-  const calculatedLevel = Math.floor(user.points / 500) + 1;
-  const mascotLevel = Math.min(calculatedLevel, 50);
-  const xpInLevel = user.points % 500;
-  const progressPercent = (xpInLevel / 500) * 100;
-  const nextLevelXP = 500;
+  const nextLevelPoints = user.level * 100;
+  const progress = (user.points % 100);
 
   return (
     <div className="space-y-6 pb-4">
@@ -149,42 +132,56 @@ export default function Dashboard({ user }: { user: User }) {
           <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
             <motion.div
               animate={{ 
-                scale: [1, 1.05, 1],
+                scale: [1, 1.1, 1],
+                rotate: [-5, 5, -5]
               }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               className="relative z-10"
             >
               <div className="absolute inset-0 bg-red-500/20 rounded-full blur-xl animate-pulse" />
-              <img 
-                src={mascotGif || `/mascot/flame-level-${mascotLevel}.gif`} 
-                alt={`Mascote Nível ${mascotLevel}`}
-                className="w-20 h-20 object-contain drop-shadow-lg relative z-10"
-                onError={(e) => {
-                  // Fallback if GIF doesn't exist yet
-                  (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/bottts/svg?seed=flame';
-                }}
-              />
+              <div className="relative">
+                <Flame size={64} className="text-red-600 drop-shadow-lg" fill="currentColor" />
+                {/* Face */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
+                  <div className="flex gap-2">
+                    <motion.div 
+                      animate={{ scaleY: [1, 0.1, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                      className="w-1.5 h-1.5 bg-white rounded-full" 
+                    />
+                    <motion.div 
+                      animate={{ scaleY: [1, 0.1, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                      className="w-1.5 h-1.5 bg-white rounded-full" 
+                    />
+                  </div>
+                  <div className="w-3 h-1.5 border-b-2 border-white rounded-full mt-1" />
+                </div>
+              </div>
+              <motion.div
+                animate={{ opacity: [0.5, 1, 0.5], scale: [0.8, 1, 0.8] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              >
+                <Flame size={32} className="text-orange-400" fill="currentColor" />
+              </motion.div>
             </motion.div>
           </div>
 
           <div className="flex-1 w-full">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-xs font-bold text-primary uppercase tracking-wider">Nível {calculatedLevel}</p>
-                <h3 className="text-2xl font-bold text-on-surface">
-                  {calculatedLevel >= 50 ? 'Nível Máximo' : 'Próximo Nível'}
-                </h3>
+                <p className="text-xs font-bold text-primary uppercase tracking-wider">Nível {user.level}</p>
+                <h3 className="text-2xl font-bold text-on-surface">Próximo Nível</h3>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-on-surface-variant">
-                  {calculatedLevel >= 50 ? `${user.points} XP` : `${xpInLevel}/${nextLevelXP} XP`}
-                </p>
+                <p className="text-sm font-bold text-on-surface-variant">{user.points}/{nextLevelPoints} XP</p>
               </div>
             </div>
             <div className="h-3 bg-surface rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: `${calculatedLevel >= 50 ? 100 : progressPercent}%` }}
+                animate={{ width: `${progress}%` }}
                 className="h-full bg-primary rounded-full"
               />
             </div>

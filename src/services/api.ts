@@ -608,31 +608,6 @@ export async function waterTree(treeId: number, userId: number) {
   return { stage: newStage, pointsEarned };
 }
 
-// --- MASCOT ---
-export async function getMascotLevel(level: number): Promise<{ level: number, gif_url: string | null }> {
-  const response = await fetch(`/api/mascot/level/${level}`);
-  if (!response.ok) throw new Error('Erro ao buscar nível do mascote');
-  return response.json();
-}
-
-export async function uploadMascotGif(level: number, file: File): Promise<{ success: boolean, gif_url: string }> {
-  const formData = new FormData();
-  formData.append('level', level.toString());
-  formData.append('file', file);
-
-  const response = await fetch('/api/admin/mascot/upload', {
-    method: 'POST',
-    body: formData
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Erro ao realizar upload do mascote');
-  }
-
-  return response.json();
-}
-
 // --- APP SETTINGS ---
 export async function getAppSettings(key: string) {
   const { data, error } = await supabase

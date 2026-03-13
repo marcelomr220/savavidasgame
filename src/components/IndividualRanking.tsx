@@ -148,7 +148,7 @@ export default function IndividualRanking({ user }: { user: User }) {
                     <span className="px-2 py-0.5 bg-red-600 text-[10px] text-white font-bold rounded-full uppercase">Você</span>
                   )}
                 </div>
-                <p className="text-xs text-stone-500">{u.team_name || 'Sem Equipe'} • Nível {Math.floor(u.points / 500) + 1}</p>
+                <p className="text-xs text-stone-500">{u.team_name || 'Sem Equipe'} • Nível {u.level}</p>
               </div>
               <div className="text-right">
                 <p className="font-bold text-stone-900">{u.points}</p>
@@ -215,7 +215,7 @@ export default function IndividualRanking({ user }: { user: User }) {
                       <Trophy size={18} fill="currentColor" />
                     </div>
                     <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Nível</p>
-                    <p className="text-lg font-bold text-stone-900">{Math.floor(selectedUser.points / 500) + 1}</p>
+                    <p className="text-lg font-bold text-stone-900">{selectedUser.level}</p>
                   </div>
                   <div className="bg-stone-50 p-4 rounded-3xl text-center">
                     <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-2">

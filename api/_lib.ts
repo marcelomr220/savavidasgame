@@ -21,13 +21,12 @@ export const db = dbInstance;
 
 // Helper for adding points to user and team
 export async function addPoints(userId: any, amount: number) {
-  if (amount === 0) return;
+  if (amount <= 0) return;
   
   try {
-    const now = new Date().toISOString();
     // Update SQLite if available
     if (db) {
-      db.prepare("UPDATE users SET points = points + ?, last_activity_at = ? WHERE id = ?").run(amount, now, userId);
+      db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(amount, userId);
       const user = db.prepare("SELECT team_id FROM users WHERE id = ?").get(userId);
       if (user && user.team_id) {
         db.prepare("UPDATE teams SET total_points = total_points + ? WHERE id = ?").run(amount, user.team_id);
@@ -37,7 +36,6 @@ export async function addPoints(userId: any, amount: number) {
     // Update Supabase
     if (supabase) {
       await supabase.rpc('increment_user_points', { row_id: userId, amount });
-      await supabase.from('users').update({ last_activity_at: now }).eq('id', userId);
       const { data: userData } = await supabase.from('users').select('team_id').eq('id', userId).single();
       if (userData?.team_id) {
         await supabase.rpc('increment_team_points', { row_id: userData.team_id, amount });
