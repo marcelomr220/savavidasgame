@@ -4,7 +4,7 @@ import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { User } from '../types';
 import { checkIn } from '../services/api';
 
-export default function Attendance({ user }: { user: User }) {
+export default function Attendance({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const [scanning, setScanning] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -48,6 +48,7 @@ export default function Attendance({ user }: { user: User }) {
     try {
       const data = await checkIn(user.id, code);
       setStatus({ type: 'success', message: `Presença confirmada! +${data.points} pontos.` });
+      if (onUpdateUser) onUpdateUser();
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message || 'Erro ao marcar presença.' });
     }

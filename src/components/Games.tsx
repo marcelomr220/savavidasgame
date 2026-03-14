@@ -18,7 +18,7 @@ import MemoryGame from './games/MemoryGame';
 import PastorAdventure from './games/PastorAdventure';
 import KingdomTree from './games/KingdomTree';
 
-export default function Games({ user }: { user: User }) {
+export default function Games({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const location = useLocation();
   const isMain = location.pathname === '/games';
 
@@ -69,10 +69,10 @@ export default function Games({ user }: { user: User }) {
           Voltar para Games
         </Link>
         <Routes>
-          <Route path="quiz" element={<Quiz user={user} />} />
-          <Route path="tree" element={<KingdomTree user={user} />} />
-          <Route path="memory" element={<MemoryGame user={user} />} />
-          <Route path="adventure" element={<PastorAdventure user={user} />} />
+          <Route path="quiz" element={<Quiz user={user} onUpdateUser={onUpdateUser} />} />
+          <Route path="tree" element={<KingdomTree user={user} onUpdateUser={onUpdateUser} />} />
+          <Route path="memory" element={<MemoryGame user={user} onUpdateUser={onUpdateUser} />} />
+          <Route path="adventure" element={<PastorAdventure user={user} onUpdateUser={onUpdateUser} />} />
         </Routes>
       </div>
     );

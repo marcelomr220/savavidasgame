@@ -5,7 +5,7 @@ import { BiblicalQuestion, User } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { getDailyQuiz, submitQuiz } from '../../services/api';
 
-export default function Quiz({ user }: { user: User }) {
+export default function Quiz({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<BiblicalQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -58,6 +58,7 @@ export default function Quiz({ user }: { user: User }) {
   const handleSubmitScore = async () => {
     try {
       await submitQuiz(user.id, score);
+      if (onUpdateUser) onUpdateUser();
     } catch (err) {
       console.error("Error submitting quiz score:", err);
     }

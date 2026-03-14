@@ -5,7 +5,7 @@ import { User } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { submitQuiz, getGamePlays, recordGamePlay } from '../../services/api';
 
-export default function PastorAdventure({ user }: { user: User }) {
+export default function PastorAdventure({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const navigate = useNavigate();
   const [finished, setFinished] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -53,6 +53,7 @@ export default function PastorAdventure({ user }: { user: User }) {
       const points = Math.min(almas * 5, 50);
       if (points > 0) {
         await submitQuiz(user.id, points);
+        if (onUpdateUser) onUpdateUser();
       }
       setFinished(true);
     } catch (err) {

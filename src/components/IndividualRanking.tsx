@@ -3,12 +3,25 @@ import { Trophy, Medal, Star, Search, X, Flame, Zap, Shield } from 'lucide-react
 import { User } from '../types';
 import { getUsers } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import Mascot from './Mascot';
 
 export default function IndividualRanking({ user }: { user: User }) {
   const [rankings, setRankings] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  function getMascotName(level: number) {
+    if (level <= 2) return 'Chama da Fé';
+    if (level <= 4) return 'Chama da Perseverança';
+    if (level <= 6) return 'Chama da Coragem';
+    if (level <= 9) return 'Chama da Sabedoria';
+    if (level <= 14) return 'Chama Eterna';
+    if (level <= 19) return 'Chama da Glória';
+    if (level <= 29) return 'Chama do Avivamento';
+    if (level <= 49) return 'Chama do Espírito';
+    return 'Chama da Santidade';
+  }
 
   useEffect(() => {
     getUsers()
@@ -148,7 +161,7 @@ export default function IndividualRanking({ user }: { user: User }) {
                     <span className="px-2 py-0.5 bg-red-600 text-[10px] text-white font-bold rounded-full uppercase">Você</span>
                   )}
                 </div>
-                <p className="text-xs text-stone-500">{u.team_name || 'Sem Equipe'} • Nível {u.level}</p>
+                <p className="text-xs text-stone-500">{u.team_name || 'Sem Equipe'} • Nível {Math.floor(u.points / 500) + 1}</p>
               </div>
               <div className="text-right">
                 <p className="font-bold text-stone-900">{u.points}</p>
@@ -215,7 +228,7 @@ export default function IndividualRanking({ user }: { user: User }) {
                       <Trophy size={18} fill="currentColor" />
                     </div>
                     <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Nível</p>
-                    <p className="text-lg font-bold text-stone-900">{selectedUser.level}</p>
+                    <p className="text-lg font-bold text-stone-900">{Math.floor(selectedUser.points / 500) + 1}</p>
                   </div>
                   <div className="bg-stone-50 p-4 rounded-3xl text-center">
                     <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-2">
@@ -232,11 +245,27 @@ export default function IndividualRanking({ user }: { user: User }) {
                   </div>
                   <div className="relative z-10 flex items-center gap-4">
                     <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center">
-                      <Flame size={32} className="text-red-500" fill="currentColor" />
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={selectedUser.id}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="w-full h-full flex items-center justify-center"
+                        >
+                          <Mascot 
+                            level={selectedUser.level || Math.floor(selectedUser.points / 500) + 1} 
+                            lastActivityAt={selectedUser.last_activity_at}
+                            size="sm"
+                          />
+                        </motion.div>
+                      </AnimatePresence>
                     </div>
                     <div>
                       <p className="text-xs font-bold text-red-400 uppercase tracking-widest">Mascote</p>
-                      <p className="text-white font-bold">Chama da Fé</p>
+                      <p className="text-white font-bold">
+                        {getMascotName(selectedUser.level || Math.floor(selectedUser.points / 500) + 1)}
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom';
 import { User, BirthdayMessage } from '../types';
 import { supabase } from '../lib/supabase';
 import BirthdayCard from './BirthdayCard';
+import Mascot from './Mascot';
 
 export default function Dashboard({ user }: { user: User }) {
   const [stats, setStats] = useState({
@@ -99,7 +100,19 @@ export default function Dashboard({ user }: { user: User }) {
     }
   };
 
-  const nextLevelPoints = user.level * 100;
+  function getMascotName(level: number) {
+    if (level <= 2) return 'Chama da Fé';
+    if (level <= 4) return 'Chama da Perseverança';
+    if (level <= 6) return 'Chama da Coragem';
+    if (level <= 9) return 'Chama da Sabedoria';
+    if (level <= 14) return 'Chama Eterna';
+    if (level <= 19) return 'Chama da Glória';
+    if (level <= 29) return 'Chama do Avivamento';
+    if (level <= 49) return 'Chama do Espírito';
+    return 'Chama da Santidade';
+  }
+
+  const nextLevelPoints = (user.level || 1) * 100;
   const progress = (user.points % 100);
 
   return (
@@ -129,42 +142,18 @@ export default function Dashboard({ user }: { user: User }) {
         
         <div className="flex flex-col sm:flex-row gap-6 items-center relative z-10">
           {/* Fire Mascot */}
-          <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
+          <div className="relative flex items-center justify-center w-24 h-24 shrink-0 bg-white/10 rounded-full shadow-inner">
             <motion.div
-              animate={{ 
-                scale: [1, 1.1, 1],
-                rotate: [-5, 5, -5]
-              }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="relative z-10"
+              key={user.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="relative z-10 w-full h-full flex items-center justify-center"
             >
-              <div className="absolute inset-0 bg-red-500/20 rounded-full blur-xl animate-pulse" />
-              <div className="relative">
-                <Flame size={64} className="text-red-600 drop-shadow-lg" fill="currentColor" />
-                {/* Face */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
-                  <div className="flex gap-2">
-                    <motion.div 
-                      animate={{ scaleY: [1, 0.1, 1] }}
-                      transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-                      className="w-1.5 h-1.5 bg-white rounded-full" 
-                    />
-                    <motion.div 
-                      animate={{ scaleY: [1, 0.1, 1] }}
-                      transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-                      className="w-1.5 h-1.5 bg-white rounded-full" 
-                    />
-                  </div>
-                  <div className="w-3 h-1.5 border-b-2 border-white rounded-full mt-1" />
-                </div>
-              </div>
-              <motion.div
-                animate={{ opacity: [0.5, 1, 0.5], scale: [0.8, 1, 0.8] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              >
-                <Flame size={32} className="text-orange-400" fill="currentColor" />
-              </motion.div>
+              <Mascot 
+                level={user.level || 1} 
+                lastActivityAt={user.last_activity_at}
+                size="md"
+              />
             </motion.div>
           </div>
 
@@ -175,6 +164,9 @@ export default function Dashboard({ user }: { user: User }) {
                 <h3 className="text-2xl font-bold text-on-surface">Próximo Nível</h3>
               </div>
               <div className="text-right">
+                <p className="text-sm font-bold text-primary uppercase tracking-widest mb-1">
+                  {getMascotName(user.level || 1)}
+                </p>
                 <p className="text-sm font-bold text-on-surface-variant">{user.points}/{nextLevelPoints} XP</p>
               </div>
             </div>

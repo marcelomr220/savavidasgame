@@ -21,6 +21,7 @@ import {
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User } from './types';
+import { getUserById } from './services/api';
 import { getAppSettings } from './services/api';
 
 // Components
@@ -100,6 +101,19 @@ export default function App() {
     setUser(null);
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const refreshUser = async () => {
+    if (!user) return;
+    try {
+      const updatedUser = await getUserById(user.id);
+      if (updatedUser) {
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+    } catch (e) {
+      console.error("Error refreshing user data:", e);
+    }
   };
 
   if (isAppLoading) {
@@ -261,14 +275,14 @@ export default function App() {
             >
               <Routes location={location}>
                 <Route path="/" element={<Dashboard user={user!} />} />
-                <Route path="/teams" element={<Teams user={user!} />} />
+                <Route path="/teams" element={<Teams user={user!} onUpdateUser={refreshUser} />} />
                 <Route path="/ranking" element={<IndividualRanking user={user!} />} />
-                <Route path="/tasks" element={<Tasks user={user!} />} />
-                <Route path="/attendance" element={<Attendance user={user!} />} />
-                <Route path="/games/*" element={<Games user={user!} />} />
+                <Route path="/tasks" element={<Tasks user={user!} onUpdateUser={refreshUser} />} />
+                <Route path="/attendance" element={<Attendance user={user!} onUpdateUser={refreshUser} />} />
+                <Route path="/games/*" element={<Games user={user!} onUpdateUser={refreshUser} />} />
                 <Route path="/bible" element={<BibleIndex />} />
                 <Route path="/bible/book/:bookId" element={<ChapterList />} />
-                <Route path="/bible/read/:chapterId" element={<ReadingView user={user!} />} />
+                <Route path="/bible/read/:chapterId" element={<ReadingView user={user!} onUpdateUser={refreshUser} />} />
                 <Route path="/profile" element={<Profile user={user!} onUpdateUser={handleUpdateUser} />} />
                 <Route path="/login" element={<Login onLogin={handleLogin} />} />
                 

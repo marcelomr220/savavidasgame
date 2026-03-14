@@ -17,7 +17,7 @@ const CHARACTERS = [
 import { useNavigate } from 'react-router-dom';
 import { submitQuiz } from '../../services/api';
 
-export default function MemoryGame({ user }: { user: User }) {
+export default function MemoryGame({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const navigate = useNavigate();
   const [cards, setCards] = useState<any[]>([]);
   const [flipped, setFlipped] = useState<number[]>([]);
@@ -76,6 +76,7 @@ export default function MemoryGame({ user }: { user: User }) {
     // Memory game gives 20 points
     try {
       await submitQuiz(user.id, 20);
+      if (onUpdateUser) onUpdateUser();
     } catch (err) {
       console.error("Error submitting memory game score:", err);
     }

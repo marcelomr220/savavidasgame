@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Task, User } from '../types';
 import { getTasks, completeTask } from '../services/api';
 
-export default function Tasks({ user }: { user: User }) {
+export default function Tasks({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -90,6 +90,7 @@ export default function Tasks({ user }: { user: User }) {
     setCompleting(taskId);
     try {
       await completeTask(user.id, taskId, ''); // Empty proofUrl for now
+      if (onUpdateUser) onUpdateUser();
       // Show success feedback
       setTimeout(() => setCompleting(null), 1500);
     } catch (err) {

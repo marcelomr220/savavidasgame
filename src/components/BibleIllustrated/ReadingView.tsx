@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Loader2, Star, AlertCircle, CheckCircle2 } f
 import { getChapter, markChapterAsRead, getChapterContent } from '../../services/api';
 import { User } from '../../types';
 
-export default function ReadingView({ user }: { user: User }) {
+export default function ReadingView({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const { chapterId } = useParams();
   const navigate = useNavigate();
   const [chapter, setChapter] = useState<any>(null);
@@ -53,6 +53,7 @@ export default function ReadingView({ user }: { user: User }) {
       const result = await markChapterAsRead(Number(chapterId), user.id);
       setReadingComplete(true);
       setPointsAwarded(result.pointsAwarded);
+      if (onUpdateUser) onUpdateUser();
     } catch (err: any) {
       setError(err.message);
     } finally {

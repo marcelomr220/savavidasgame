@@ -4,7 +4,7 @@ import { Team, User } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getTeams, getTeamMembers, joinTeam } from '../services/api';
 
-export default function Teams({ user }: { user: User }) {
+export default function Teams({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -28,7 +28,7 @@ export default function Teams({ user }: { user: User }) {
     e.stopPropagation();
     try {
       await joinTeam(user.id, teamId);
-      window.location.reload();
+      if (onUpdateUser) onUpdateUser();
     } catch (err) {
       console.error("Error joining team:", err);
     }

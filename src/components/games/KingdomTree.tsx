@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, UserTree } from '../../types';
 import { getUserTrees, plantTree, waterTree, getTreeTypes } from '../../services/api';
 
-export default function KingdomTree({ user }: { user: User }) {
+export default function KingdomTree({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const [tree, setTree] = useState<UserTree | null>(null);
   const [treeTypes, setTreeTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +60,7 @@ export default function KingdomTree({ user }: { user: User }) {
       
       if (data && data.pointsEarned > 0) {
         setFeedback(`Evoluiu! +${data.pointsEarned} pts`);
+        if (onUpdateUser) onUpdateUser();
       }
       setTimeout(() => {
         fetchTree();
