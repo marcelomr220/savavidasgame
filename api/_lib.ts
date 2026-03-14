@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import Database from "better-sqlite3";
 import path from "path";
 import dotenv from "dotenv";
 
@@ -10,12 +9,16 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 export const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
-// SQLite Database
-let dbInstance: any;
-try {
-  dbInstance = new Database("community.db");
-} catch (e) {
-  console.warn("SQLite database not available, using Supabase only");
+// SQLite Database - only use in development or if explicitly enabled
+let dbInstance: any = null;
+if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SQLITE === 'true') {
+  try {
+    // Dynamic import to avoid build-time errors with native modules on Vercel
+    const Database = (await import("better-sqlite3")).default;
+    dbInstance = new Database("community.db");
+  } catch (e) {
+    console.warn("SQLite database not available, using Supabase only");
+  }
 }
 export const db = dbInstance;
 
