@@ -4,35 +4,35 @@
   "rewrites": [
     {
       "source": "/api/login",
-      "destination": "/api/login.ts"
+      "destination": "/api/auth.ts?login=true"
     },
     {
       "source": "/api/register",
-      "destination": "/api/register.ts"
+      "destination": "/api/auth.ts?register=true"
     },
     {
       "source": "/api/users/:id",
-      "destination": "/api/users.ts?id=:id"
+      "destination": "/api/community.ts?id=:id"
     },
     {
       "source": "/api/users",
-      "destination": "/api/users.ts"
+      "destination": "/api/community.ts"
     },
     {
       "source": "/api/teams/:id/members",
-      "destination": "/api/teams.ts?id=:id&members=true"
+      "destination": "/api/community.ts?id=:id&members=true"
     },
     {
       "source": "/api/teams",
-      "destination": "/api/teams.ts"
+      "destination": "/api/community.ts?teams=true"
     },
     {
       "source": "/api/tasks",
-      "destination": "/api/tasks.ts"
+      "destination": "/api/activities.ts?tasks=true"
     },
     {
       "source": "/api/tasks/complete",
-      "destination": "/api/tasks.ts?complete=true"
+      "destination": "/api/activities.ts?complete=true"
     },
     {
       "source": "/api/admin/tasks/pending",
@@ -95,80 +95,72 @@
       "destination": "/api/admin.ts?teams=true"
     },
     {
-      "source": "/api/admin/tasks/:id",
-      "destination": "/api/admin.ts?id=:id&tasks=true"
-    },
-    {
-      "source": "/api/admin/tasks",
-      "destination": "/api/admin.ts?tasks=true"
-    },
-    {
       "source": "/api/birthdays/:userId/messages",
-      "destination": "/api/birthdays.ts?userId=:userId&messages=true"
+      "destination": "/api/content.ts?userId=:userId&messages=true"
     },
     {
       "source": "/api/birthdays",
-      "destination": "/api/birthdays.ts"
+      "destination": "/api/content.ts"
     },
     {
       "source": "/api/attendance/checkin",
-      "destination": "/api/attendance.ts?checkin=true"
+      "destination": "/api/activities.ts?checkin=true"
     },
     {
       "source": "/api/settings/:key",
-      "destination": "/api/settings.ts?key=:key"
+      "destination": "/api/admin.ts?settings=true&key=:key"
     },
     {
       "source": "/api/settings",
-      "destination": "/api/settings.ts"
+      "destination": "/api/admin.ts?settings=true"
     },
     {
       "source": "/api/games/plays",
-      "destination": "/api/games.ts?plays=true"
+      "destination": "/api/activities.ts?plays=true"
     },
     {
       "source": "/api/games/record-play",
-      "destination": "/api/games.ts?recordPlay=true"
+      "destination": "/api/activities.ts?recordPlay=true"
     },
     {
       "source": "/api/bible/books",
-      "destination": "/api/bible.ts?books=true"
+      "destination": "/api/content.ts?books=true"
     },
     {
       "source": "/api/bible/books/:bookId/chapters",
-      "destination": "/api/bible.ts?chapters=true&bookId=:bookId"
+      "destination": "/api/content.ts?chapters=true&bookId=:bookId"
     },
     {
       "source": "/api/bible/chapters/:chapterId/read",
-      "destination": "/api/bible.ts?read=true&chapterId=:chapterId"
+      "destination": "/api/content.ts?read=true&chapterId=:chapterId"
     },
     {
       "source": "/api/bible/chapters/:chapterId",
-      "destination": "/api/bible.ts?chapterId=:chapterId"
+      "destination": "/api/content.ts?chapterId=:chapterId"
     },
     {
       "source": "/api/quiz/daily",
-      "destination": "/api/quiz.ts?daily=true"
+      "destination": "/api/activities.ts?daily=true"
     },
     {
       "source": "/api/quiz/submit",
-      "destination": "/api/quiz.ts?submit=true"
+      "destination": "/api/activities.ts?submit=true"
     },
     {
       "source": "/api/tree/user/:userId",
-      "destination": "/api/tree.ts?userId=:userId"
+      "destination": "/api/activities.ts?userId=:userId"
     },
     {
       "source": "/api/tree/plant",
-      "destination": "/api/tree.ts?plant=true"
+      "destination": "/api/activities.ts?plant=true"
     },
     {
       "source": "/api/tree/water",
-      "destination": "/api/tree.ts?water=true"
+      "destination": "/api/activities.ts?water=true"
     },
     {
       "source": "/api/tree/types",
-      "destination": "/api/tree.ts?types=true"
+      "destination": "/api/activities.ts?types=true"
     },
     {
       "source": "/api/(.*)",
