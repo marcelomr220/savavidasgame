@@ -1,0 +1,7 @@
+{
+  "name": "Salva Vidas Game 2",
+  "description": "Sistema gamificado de engajamento para comunidade religiosa com rankings, tarefas e mini-games.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
