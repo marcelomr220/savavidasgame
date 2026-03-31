@@ -7,7 +7,7 @@ export async function login(email: string, password: string): Promise<User> {
   const response = await fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ action: 'login', email, password })
   });
 
   if (!response.ok) {
@@ -15,14 +15,16 @@ export async function login(email: string, password: string): Promise<User> {
     throw new Error(errorData.error || 'Credenciais inválidas');
   }
 
-  return await response.json();
+  const data = await response.json();
+  // Support both { success: true, user: ... } and direct user object
+  return data.user || data;
 }
 
 export async function register(name: string, email: string, password: string): Promise<User> {
   const response = await fetch('/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, password })
+    body: JSON.stringify({ action: 'register', name, email, password })
   });
 
   if (!response.ok) {
@@ -30,7 +32,9 @@ export async function register(name: string, email: string, password: string): P
     throw new Error(errorData.error || 'Erro ao registrar');
   }
 
-  return await response.json();
+  const data = await response.json();
+  // Support both { success: true, user: ... } and direct user object
+  return data.user || data;
 }
 
 // --- USERS ---

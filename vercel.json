@@ -6,7 +6,7 @@
     },
     {
       "source": "/api/:path*",
-      "destination": "/api/admin?action=$path"
+      "destination": "/api/admin?action=:path"
     },
     {
       "source": "/((?!api/).*)",

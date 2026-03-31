@@ -75,13 +75,29 @@ function calculateAge(birthDate: string | null): number {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { method, query, body } = req;
-  const action = query.action as string;
+  const { method, query } = req;
+  let body = req.body;
+
+  // Robust body parsing fallback for serverless environments
+  if (method === 'POST' && typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch (e) {
+      console.error("Failed to parse request body as JSON:", e);
+    }
+  }
+
+  // Action can come from query (via rewrite) or from body (explicitly)
+  const action = (query.action || body?.action) as string;
 
   console.log(`Unified API Request: ${method} ${req.url}`, { action, query, body });
 
   if (!action) {
-    return res.status(400).json({ error: "Action is required" });
+    return res.status(400).json({ 
+      success: false, 
+      error: "Missing action", 
+      details: "The 'action' parameter is required in the query string or request body." 
+    });
   }
 
   try {
@@ -1065,7 +1081,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       default:
-        return res.status(400).json({ error: "Unknown action" });
+        return res.status(400).json({ 
+          success: false, 
+          error: "Invalid action", 
+          details: `The action '${action}' is not recognized by the server.` 
+        });
     }
   } catch (err: any) {
     console.error(`API Error in action ${action}:`, err);

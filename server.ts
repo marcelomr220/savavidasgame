@@ -378,58 +378,86 @@ async function startServer(app: any) {
 
   // Auth (Simplified with Hashing)
   app.post("/api/login", async (req, res) => {
-    const { email, password } = req.body;
-    
-    if (supabase) {
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*, teams!team_id(name)')
-        .eq('email', email)
-        .single();
-
-      if (user) {
-        const isMatch = user.password.startsWith('$2a$') || user.password.startsWith('$2b$') 
-          ? await bcrypt.compare(password, user.password)
-          : user.password === password;
-
-        if (isMatch) {
-          // Flatten team name if it exists from the join
-          const formattedUser = {
-            ...user,
-            team_name: user.teams?.name || null
-          };
-          return res.json(formattedUser);
-        }
-      }
-    }
-
-    // Fallback to SQLite
-    if (db) {
-      const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    try {
+      const { email, password, action } = req.body;
       
-      if (user) {
-        const isMatch = user.password.startsWith('$2a$') || user.password.startsWith('$2b$') 
-          ? await bcrypt.compare(password, user.password)
-          : user.password === password;
+      // If action is provided, it should be 'login'
+      if (action && action !== 'login') {
+        return res.status(400).json({ success: false, error: "Invalid action for this endpoint" });
+      }
 
-        if (isMatch) {
-          if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
-            const hashedPassword = await bcrypt.hash(password, 10);
-            db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashedPassword, user.id);
+      if (!email || !password) {
+        return res.status(400).json({ success: false, error: "Email e senha são obrigatórios" });
+      }
+      
+      if (supabase) {
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('*, teams!team_id(name)')
+          .eq('email', email)
+          .single();
+
+        if (user) {
+          const isMatch = user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) 
+            ? await bcrypt.compare(password, user.password)
+            : user.password === password;
+
+          if (isMatch) {
+            const now = new Date().toISOString();
+            await supabase.from('users').update({ last_activity_at: now }).eq('id', user.id);
+            
+            const { password: _, ...userWithoutPassword } = user;
+            return res.json({
+              success: true,
+              user: { ...userWithoutPassword, team_name: user.teams?.name || null }
+            });
           }
-          return res.json(user);
         }
       }
-    }
 
-    res.status(401).json({ error: "Credenciais inválidas" });
+      // Fallback to SQLite
+      if (db) {
+        const user = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id WHERE u.email = ?").get(email);
+        
+        if (user) {
+          const isMatch = user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) 
+            ? await bcrypt.compare(password, user.password)
+            : user.password === password;
+
+          if (isMatch) {
+            const now = new Date().toISOString();
+            db.prepare("UPDATE users SET last_activity_at = ? WHERE id = ?").run(now, user.id);
+            
+            if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
+              const hashedPassword = await bcrypt.hash(password, 10);
+              db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashedPassword, user.id);
+            }
+            
+            const { password: _, ...userWithoutPassword } = user;
+            return res.json({
+              success: true,
+              user: { ...userWithoutPassword, team_name: user.team_name || null }
+            });
+          }
+        }
+      }
+
+      res.status(401).json({ success: false, error: "Credenciais inválidas" });
+    } catch (err: any) {
+      console.error("Login error:", err);
+      res.status(500).json({ success: false, error: "Erro interno no servidor" });
+    }
   });
 
   app.post("/api/register", async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, action } = req.body;
     
+    if (action && action !== 'register') {
+      return res.status(400).json({ success: false, error: "Invalid action for this endpoint" });
+    }
+
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "Nome, email e senha são obrigatórios" });
+      return res.status(400).json({ success: false, error: "Nome, email e senha são obrigatórios" });
     }
 
     try {
@@ -464,45 +492,39 @@ async function startServer(app: any) {
         if (error) throw error;
 
         // Sync to SQLite
-        db.prepare("INSERT OR REPLACE INTO users (id, name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
-          newUser.id, name, email, hashedPassword, 'user', 0, 1, 0
-        );
+        if (db) {
+          db.prepare("INSERT OR REPLACE INTO users (id, name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+            newUser.id, name, email, hashedPassword, 'user', 0, 1, 0
+          );
+        }
 
-        return res.json(newUser);
+        return res.json({ success: true, user: newUser });
       }
 
       // SQLite only fallback
-      const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-      if (existingUser) {
-        return res.status(400).json({ error: "Este email já está cadastrado" });
-      }
-
-      let lastId = Date.now();
       if (db) {
+        const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+        if (existingUser) {
+          return res.status(400).json({ success: false, error: "Este email já está cadastrado" });
+        }
+
         const result = db.prepare("INSERT INTO users (name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
           name, email, hashedPassword, 'user', 0, 1, 0
         );
-        lastId = result.lastInsertRowid;
-      }
-      
-      if (supabase) {
-        await supabase.from('users').insert([{ id: lastId, name, email, password: hashedPassword, role: 'user', points: 0, level: 1, streak: 0 }]);
-      }
-      
-      if (db) {
+        const lastId = result.lastInsertRowid;
+        
+        if (supabase) {
+          await supabase.from('users').insert([{ id: lastId, name, email, password: hashedPassword, role: 'user', points: 0, level: 1, streak: 0 }]);
+        }
+        
         const newUser = db.prepare("SELECT * FROM users WHERE id = ?").get(lastId);
-        return res.json(newUser);
+        return res.json({ success: true, user: newUser });
       }
       
-      if (supabase) {
-        const { data } = await supabase.from('users').select('*').eq('id', lastId).single();
-        return res.json(data);
-      }
-      
-      res.json({ id: lastId, name, email, role: 'user', points: 0, level: 1, streak: 0 });
+      return res.status(500).json({ success: false, error: "Serviço de banco de dados indisponível" });
     } catch (err: any) {
       console.error("Registration error:", err);
-      res.status(500).json({ error: err.message || "Erro ao realizar cadastro" });
+      res.status(500).json({ success: false, error: err.message || "Erro ao realizar cadastro" });
     }
   });
 
