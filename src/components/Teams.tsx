@@ -80,52 +80,39 @@ export default function Teams({ user, onUpdateUser }: { user: User, onUpdateUser
               </div>
             </div>
             <div className="p-6 pt-16">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-2xl font-black text-stone-900 tracking-tight">{team.name}</h3>
-                  <p className="text-sm text-stone-500">{team.description}</p>
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-2xl font-black text-stone-900 tracking-tight truncate">{team.name}</h3>
+                  <p className="text-sm text-stone-500 line-clamp-2 mt-1">{team.description}</p>
                 </div>
-                <div className="text-right">
-                  <div className="flex items-center gap-1 text-red-600 font-bold">
+                <div className="text-right shrink-0 ml-4">
+                  <div className="flex items-center justify-end gap-1 text-red-600 font-bold">
                     <Star size={16} fill="currentColor" />
                     <span>{team.total_points}</span>
                   </div>
-                  <p className="text-[10px] font-bold text-stone-400 uppercase">Pontos Totais</p>
+                  <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Pontos Totais</p>
                 </div>
               </div>
 
-                <div className="flex flex-col gap-3 mb-6">
-                  <div className="flex items-center gap-2">
-                    <Users size={18} className="text-stone-400" />
-                    <span className="text-sm font-semibold text-stone-700">{team.member_count} membros</span>
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-stone-50 p-3 rounded-2xl border border-stone-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users size={14} className="text-stone-400" />
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Membros</p>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    {team.monitor_name && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-stone-100 overflow-hidden border border-red-100">
-                          <img 
-                            src={team.monitor_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${team.monitor_name}`} 
-                            alt={team.monitor_name} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <span className="text-sm font-semibold text-red-600">Monitor: {team.monitor_name}</span>
-                      </div>
-                    )}
-                    {team.leader_name && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-stone-100 overflow-hidden border border-amber-100">
-                          <img 
-                            src={team.leader_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${team.leader_name}`} 
-                            alt={team.leader_name} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <span className="text-sm font-semibold text-amber-600">Líder: {team.leader_name}</span>
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-sm font-bold text-stone-900">{team.member_count || 0} integrantes</p>
                 </div>
+
+                <div className="bg-stone-50 p-3 rounded-2xl border border-stone-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <UserPlus size={14} className="text-stone-400" />
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Monitor</p>
+                  </div>
+                  <p className="text-sm font-bold text-red-600 truncate">
+                    {team.monitor_name || 'Não definido'}
+                  </p>
+                </div>
+              </div>
 
               {user.team_id === team.id ? (
                 <div className="w-full py-3 px-4 bg-red-50 text-red-700 rounded-xl font-bold text-center border border-red-100">

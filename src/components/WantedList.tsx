@@ -48,7 +48,11 @@ export default function WantedList() {
         }
       });
 
+      // IDs to exclude from the wanted list (per user request)
+      const excludedUserIds = [36, 26, 46, 47, 30, 32, 31];
+
       const processed: WantedUser[] = (users || [])
+        .filter(u => !excludedUserIds.includes(u.id))
         .map(u => {
           const lastAtt = userLastAttendance[u.id];
           if (!lastAtt) {

@@ -207,8 +207,23 @@ export default function Dashboard({ user }: { user: User }) {
       setStats(prev => ({ ...prev, weeklyPoints: user.points })); // Simplified
 
       if (user.team_id) {
-        const team = await supabase.from('teams').select('*').eq('id', user.team_id).single();
-        if (team.data) setTeamInfo(team.data);
+        const { data: team } = await supabase
+          .from('teams')
+          .select(`
+            *,
+            users(count),
+            monitor:users!monitor_id(name, avatar)
+          `)
+          .eq('id', user.team_id)
+          .single();
+          
+        if (team) {
+          setTeamInfo({
+            ...team,
+            member_count: team.users?.[0]?.count || team.users?.count || 0,
+            monitor_name: team.monitor?.name || null
+          });
+        }
       }
     } catch (err) {
       console.error("Error fetching dashboard stats:", err);
@@ -476,6 +491,14 @@ export default function Dashboard({ user }: { user: User }) {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="bg-stone-50 p-4 rounded-2xl text-center">
+                            <p className="text-xs font-bold text-stone-400 uppercase mb-1">Membros</p>
+                            <p className="text-xl font-bold text-stone-900">{teamInfo.member_count || 0}</p>
+                          </div>
+                          <div className="bg-stone-50 p-4 rounded-2xl text-center">
+                            <p className="text-xs font-bold text-stone-400 uppercase mb-1">Monitor</p>
+                            <p className="text-sm font-bold text-red-600 truncate">{teamInfo.monitor_name || 'Não definido'}</p>
+                          </div>
+                          <div className="bg-stone-50 p-4 rounded-2xl text-center">
                             <p className="text-xs font-bold text-stone-400 uppercase mb-1">Pontos Totais</p>
                             <p className="text-xl font-bold text-red-600">{teamInfo.total_points} pts</p>
                           </div>
@@ -512,7 +535,8 @@ export default function Dashboard({ user }: { user: User }) {
       {/* Quick Actions */}
       <section>
         <h3 className="text-lg font-bold text-on-surface mb-4">Ações Rápidas</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <ActionLink to="/tasks" icon={CheckSquare} title="Tarefas" desc="Ver missões disponíveis" />
           <ActionLink to="/games/investigation" icon={Search} title="Mistério" desc="Modo Investigação" />
           <ActionLink to="/games" icon={Gamepad2} title="Jogar" desc="Ganhe pontos extras" />
         </div>

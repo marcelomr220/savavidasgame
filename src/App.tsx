@@ -163,12 +163,12 @@ export default function App() {
     <div className="min-h-screen flex flex-col md:flex-row bg-surface">
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-surface sticky top-0 z-50 border-b border-stone-100">
-        <div className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-sm">
             <Star size={24} fill="currentColor" />
           </div>
           <span className="font-bold text-on-surface text-lg">Salva Vidas</span>
-        </div>
+        </Link>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <Link to="/admin" className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors">

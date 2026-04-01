@@ -1,14 +1,16 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Trophy, User, Book } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, User, CheckSquare, Gamepad2 } from 'lucide-react';
 
 export default function BottomNavigation() {
   const location = useLocation();
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Início' },
+    { path: '/tasks', icon: CheckSquare, label: 'Tarefas' },
     { path: '/teams', icon: Users, label: 'Equipes' },
     { path: '/ranking', icon: Trophy, label: 'Ranking' },
+    { path: '/games', icon: Gamepad2, label: 'Games' },
     { path: '/profile', icon: User, label: 'Perfil' },
   ];
 

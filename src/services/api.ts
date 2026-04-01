@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
 import { User, Team, Task, UserTask, BiblicalQuestion, UserTree, InvestigationCase, InvestigationClue, TeamAnswer, InvestigationHint, InvestigationNotification } from '../types';
-import bcrypt from "bcryptjs";
 
 // --- AUTH ---
 export async function login(email: string, password: string): Promise<User> {
@@ -139,7 +138,7 @@ export async function getTeams(): Promise<Team[]> {
 
   const mappedTeams = (data || []).map(t => ({
     ...t,
-    member_count: t.users?.[0]?.count || 0,
+    member_count: t.users?.[0]?.count || t.users?.count || 0,
     monitor_name: t.monitor?.name || null,
     monitor_avatar: t.monitor?.avatar || null,
     leader_name: t.leader?.name || null,
@@ -914,14 +913,16 @@ export async function submitInvestigationAnswer(userId: number, teamId: number, 
       case_id: caseId,
       team_id: teamId,
       action_type: 'correct_answer',
-      description: 'Equipe acertou o enigma'
+      description: 'Equipe acertou o enigma',
+      points_spent: 0
     }]);
   } else {
     await supabase.from('investigation_team_logs').insert([{
       case_id: caseId,
       team_id: teamId,
       action_type: 'answer_attempt',
-      description: 'Equipe tentou uma resposta'
+      description: 'Equipe tentou uma resposta',
+      points_spent: 0
     }]);
 
     if (isEliminated) {
@@ -929,7 +930,8 @@ export async function submitInvestigationAnswer(userId: number, teamId: number, 
         case_id: caseId,
         team_id: teamId,
         action_type: 'eliminated',
-        description: 'Equipe foi desclassificada por exceder tentativas'
+        description: 'Equipe foi desclassificada por exceder tentativas',
+        points_spent: 0
       }]);
     }
   }
@@ -942,11 +944,27 @@ export async function submitInvestigationAnswer(userId: number, teamId: number, 
       case_id: caseId,
       answer_text: answer.trim(),
       is_correct: isCorrect,
-      points_awarded: pointsAwarded,
-      created_at: new Date().toISOString()
+      points_awarded: pointsAwarded
     }]);
   
-  if (insertError) throw insertError;
+  if (insertError) {
+    console.error('Error saving team answer:', insertError);
+    // If answer_text fails, try answer (to match some schema versions)
+    if (insertError.message.includes('column "answer_text" of relation "team_answers" does not exist')) {
+      const { error: retryError } = await supabase
+        .from('team_answers')
+        .insert([{
+          team_id: teamId,
+          case_id: caseId,
+          answer: answer.trim(),
+          is_correct: isCorrect,
+          points_awarded: pointsAwarded
+        }]);
+      if (retryError) throw retryError;
+    } else {
+      throw insertError;
+    }
+  }
 
   return { isCorrect, points: pointsAwarded };
 }
@@ -1032,19 +1050,18 @@ export async function seedInvestigationCase() {
   if (caseError) throw caseError;
 
   const clues = [
-    { clue_text: "Não escrevi leis, mas ungi quem governaria.", release_day: 1 },
-    { clue_text: "Minha história começa com uma mulher que chorava em silêncio.", release_day: 2 },
-    { clue_text: "Ouvi meu nome sendo chamado enquanto ainda era criança… mas não sabia quem falava.", release_day: 3 },
-    { clue_text: "Fui instruído por alguém que já não ouvia mais claramente a voz de Deus.", release_day: 4 },
-    { clue_text: "Toquei a cabeça de dois reis… um caiu, o outro se levantou.", release_day: 5 },
-    { clue_text: "Minha morte não encerrou minha voz.", release_day: 6 },
-    { clue_text: "Mesmo depois de morto, fui chamado novamente.", release_day: 7 }
+    { clue_text: "Não escrevi leis, mas ungi quem governaria.", release_datetime: new Date(startsAt.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString() },
+    { clue_text: "Minha história começa com uma mulher que chorava em silêncio.", release_datetime: new Date(startsAt.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString() },
+    { clue_text: "Ouvi meu nome sendo chamado enquanto ainda era criança… mas não sabia quem falava.", release_datetime: new Date(startsAt.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString() },
+    { clue_text: "Fui instruído por alguém que já não ouvia mais claramente a voz de Deus.", release_datetime: new Date(startsAt.getTime() + 4 * 24 * 60 * 60 * 1000).toISOString() },
+    { clue_text: "Toquei a cabeça de dois reis… um caiu, o outro se levantou.", release_datetime: new Date(startsAt.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString() },
+    { clue_text: "Minha morte não encerrou minha voz.", release_datetime: new Date(startsAt.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString() },
+    { clue_text: "Mesmo depois de morto, fui chamado novamente.", release_datetime: new Date(startsAt.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() }
   ];
 
   const cluesToInsert = clues.map(c => ({
     ...c,
-    case_id: newCase.id,
-    release_time: '18:00'
+    case_id: newCase.id
   }));
 
   const { error: cluesError } = await supabase

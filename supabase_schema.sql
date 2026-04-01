@@ -206,6 +206,10 @@ CREATE TABLE investigation_cases (
   answer TEXT NOT NULL,
   starts_at TIMESTAMPTZ NOT NULL,
   ends_at TIMESTAMPTZ NOT NULL,
+  reward_points INTEGER DEFAULT 100,
+  max_attempts INTEGER,
+  use_dynamic_scoring BOOLEAN DEFAULT FALSE,
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -214,8 +218,36 @@ CREATE TABLE investigation_clues (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id UUID REFERENCES investigation_cases(id) ON DELETE CASCADE,
   clue_text TEXT NOT NULL,
-  release_day INTEGER NOT NULL, -- 1 to 7
-  release_time TIME DEFAULT '18:00',
+  release_datetime TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Investigation Hints Table
+CREATE TABLE investigation_hints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID REFERENCES investigation_cases(id) ON DELETE CASCADE,
+  hint_text TEXT NOT NULL,
+  cost_points INTEGER DEFAULT 10,
+  release_datetime TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Investigation Hint Purchases Table
+CREATE TABLE investigation_hint_purchases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  hint_id UUID REFERENCES investigation_hints(id) ON DELETE CASCADE,
+  team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE,
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(hint_id, team_id)
+);
+
+-- Investigation Notifications Table
+CREATE TABLE investigation_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID REFERENCES investigation_cases(id) ON DELETE CASCADE,
+  clue_id UUID REFERENCES investigation_clues(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -224,16 +256,30 @@ CREATE TABLE team_answers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE,
   case_id UUID REFERENCES investigation_cases(id) ON DELETE CASCADE,
-  answer TEXT NOT NULL,
+  answer_text TEXT NOT NULL,
   is_correct BOOLEAN DEFAULT FALSE,
-  submitted_at TIMESTAMPTZ DEFAULT NOW()
+  points_awarded INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Team Actions Table
-CREATE TABLE team_actions (
+-- Investigation Team Attempts Table
+CREATE TABLE investigation_team_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID REFERENCES investigation_cases(id) ON DELETE CASCADE,
   team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE,
-  action_type TEXT NOT NULL, -- e.g., "buy_hint", "block_team"
-  cost INTEGER DEFAULT 0,
+  attempts_used INTEGER DEFAULT 0,
+  is_eliminated BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(case_id, team_id)
+);
+
+-- Investigation Team Logs Table
+CREATE TABLE investigation_team_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID REFERENCES investigation_cases(id) ON DELETE CASCADE,
+  team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE,
+  action_type TEXT NOT NULL, -- 'hint_purchase', 'answer_attempt', 'correct_answer', 'eliminated'
+  description TEXT,
+  points_spent INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
