@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Image, Save, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Settings, Image, Save, Loader2, AlertCircle, CheckCircle2, Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getAppSettings, updateAppSettings } from '../services/api';
 
 export default function AdminSettings() {
   const [logoUrl, setLogoUrl] = useState('');
+  const [splashUrl, setSplashUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -14,6 +15,9 @@ export default function AdminSettings() {
       try {
         const logo = await getAppSettings('login_logo');
         if (logo) setLogoUrl(logo);
+        
+        const splash = await getAppSettings('splash_logo');
+        if (splash) setSplashUrl(splash);
       } catch (err) {
         console.error("Error fetching settings:", err);
       } finally {
@@ -30,6 +34,7 @@ export default function AdminSettings() {
 
     try {
       await updateAppSettings('login_logo', logoUrl);
+      await updateAppSettings('splash_logo', splashUrl);
       setMessage({ type: 'success', text: 'Configurações salvas com sucesso!' });
     } catch (err: any) {
       console.error("Error saving settings:", err);
@@ -39,18 +44,19 @@ export default function AdminSettings() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'splash') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 1024 * 1024) {
-      alert('A imagem deve ter no máximo 1MB');
+    if (file.size > 2 * 1024 * 1024) {
+      alert('O arquivo deve ter no máximo 2MB');
       return;
     }
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setLogoUrl(reader.result as string);
+      if (type === 'logo') setLogoUrl(reader.result as string);
+      else setSplashUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -66,10 +72,11 @@ export default function AdminSettings() {
 
       <div className="max-w-2xl">
         <form onSubmit={handleSave} className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm space-y-8">
+          {/* Logo Section */}
           <section className="space-y-6">
             <h3 className="font-bold text-stone-900 flex items-center gap-2">
               <Image size={20} className="text-red-600" />
-              Logo do Aplicativo
+              Logo do Login
             </h3>
             
             <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -80,14 +87,14 @@ export default function AdminSettings() {
                   <Image size={32} className="text-stone-300" />
                 )}
                 <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white cursor-pointer transition-opacity">
-                  <span className="text-xs font-bold">Alterar</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                  <span className="text-xs font-bold text-center px-2">Alterar Logo</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'logo')} />
                 </label>
               </div>
 
               <div className="flex-1 space-y-4 w-full">
                 <div>
-                  <label className="block text-sm font-bold text-stone-700 mb-2">URL da Logo (ou Base64)</label>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">URL da Logo</label>
                   <input 
                     type="text"
                     value={logoUrl}
@@ -96,8 +103,46 @@ export default function AdminSettings() {
                     className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
                   />
                 </div>
-                <p className="text-xs text-stone-400">Esta logo será exibida na tela de abertura (Splash Screen) e na tela de Login.</p>
-                <p className="text-xs text-stone-400">Recomendado: Imagem quadrada (PNG ou SVG) com fundo transparente ou sólido.</p>
+                <p className="text-xs text-stone-400">Esta logo será exibida na tela de Login.</p>
+              </div>
+            </div>
+          </section>
+
+          <hr className="border-stone-100" />
+
+          {/* Splash Screen Section */}
+          <section className="space-y-6">
+            <h3 className="font-bold text-stone-900 flex items-center gap-2">
+              <Flame size={20} className="text-orange-500" />
+              Splash Screen (Abertura)
+            </h3>
+            
+            <div className="flex flex-col md:flex-row gap-8 items-start">
+              <div className="w-32 h-32 rounded-2xl bg-stone-50 border-2 border-dashed border-stone-200 flex items-center justify-center overflow-hidden relative group">
+                {splashUrl ? (
+                  <img src={splashUrl} alt="Preview Splash" className="w-full h-full object-cover" />
+                ) : (
+                  <Image size={32} className="text-stone-300" />
+                )}
+                <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white cursor-pointer transition-opacity">
+                  <span className="text-xs font-bold text-center px-2">Alterar Splash</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'splash')} />
+                </label>
+              </div>
+
+              <div className="flex-1 space-y-4 w-full">
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">URL da Animação (GIF ou Imagem)</label>
+                  <input 
+                    type="text"
+                    value={splashUrl}
+                    onChange={(e) => setSplashUrl(e.target.value)}
+                    placeholder="https://exemplo.com/splash.gif"
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                  />
+                </div>
+                <p className="text-xs text-stone-400">Esta imagem ou GIF será exibido quando o app for aberto.</p>
+                <p className="text-xs text-stone-400 font-medium text-orange-600">Dica: Use um GIF animado para uma abertura mais dinâmica!</p>
               </div>
             </div>
           </section>

@@ -56,8 +56,14 @@ export default function App() {
     const initApp = async () => {
       try {
         // Fetch app settings (logo)
-        const logo = await getAppSettings('login_logo');
-        if (logo) setAppLogo(logo);
+        const splash = await getAppSettings('splash_logo');
+        const loginLogo = await getAppSettings('login_logo');
+        
+        if (splash) {
+          setAppLogo(splash);
+        } else if (loginLogo) {
+          setAppLogo(loginLogo);
+        }
 
         // Check auth
         const savedUser = localStorage.getItem('user');
