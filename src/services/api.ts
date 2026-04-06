@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { User, Team, Task, UserTask, BiblicalQuestion, UserTree, InvestigationCase, InvestigationClue, TeamAnswer, InvestigationHint, InvestigationNotification, GameMatch, GamePlayer, GameTask, GamePlayerTask, GameEvent, GameVote } from '../types';
+import { User, Team, Task, UserTask, BiblicalQuestion, UserTree, InvestigationCase, InvestigationClue, TeamAnswer, InvestigationHint, InvestigationNotification } from '../types';
 
 // --- AUTH ---
 export async function login(email: string, password: string): Promise<User> {
@@ -99,51 +99,44 @@ export async function deleteUser(userId: number) {
 // --- TEAMS ---
 export async function getTeams(): Promise<Team[]> {
   console.log("api.ts: getTeams called");
-  // Simplified query to avoid relationship ambiguity issues
-  const { data, error } = await supabase
-    .from('teams')
-    .select(`
-      *,
-      users!users_team_id_fkey(count),
-      monitor:users!teams_monitor_id_fkey(name, avatar),
-      leader:users!teams_leader_id_fkey(name, avatar)
-    `)
-    .order('total_points', { ascending: false });
   
-  if (error) {
-    console.error("api.ts: getTeams Supabase error:", error);
-    // Fallback to even simpler query if the above fails
-    console.log("api.ts: getTeams falling back to simple query...");
-    const { data: simpleData, error: simpleError } = await supabase
-      .from('teams')
-      .select('*')
-      .order('total_points', { ascending: false });
-      
-    if (simpleError) {
-      console.error("api.ts: getTeams fallback error:", simpleError);
-      throw simpleError;
-    }
+  // Fetch teams first
+  const { data: teamsData, error: teamsError } = await supabase
+    .from('teams')
+    .select('*')
+    .order('total_points', { ascending: false });
     
-    return (simpleData || []).map(t => ({
-      ...t,
-      member_count: 0,
-      monitor_name: null,
-      monitor_avatar: null,
-      leader_name: null,
-      leader_avatar: null
-    })) as Team[];
+  if (teamsError) {
+    console.error("api.ts: getTeams Supabase error:", teamsError);
+    throw teamsError;
   }
   
-  console.log("api.ts: getTeams raw data:", data);
-
-  const mappedTeams = (data || []).map(t => ({
-    ...t,
-    member_count: t.users?.[0]?.count || t.users?.count || 0,
-    monitor_name: t.monitor?.name || null,
-    monitor_avatar: t.monitor?.avatar || null,
-    leader_name: t.leader?.name || null,
-    leader_avatar: t.leader?.avatar || null
-  })) as Team[];
+  // Fetch all users to map leader/monitor names and count members
+  const { data: usersData, error: usersError } = await supabase
+    .from('users')
+    .select('id, name, avatar, team_id');
+    
+  if (usersError) {
+    console.error("api.ts: getTeams users fetch error:", usersError);
+    // Continue with teams only if users fetch fails
+  }
+  
+  const users = usersData || [];
+  
+  const mappedTeams = (teamsData || []).map(t => {
+    const members = users.filter(u => u.team_id === t.id);
+    const leader = users.find(u => u.id === t.leader_id);
+    const monitor = users.find(u => u.id === t.monitor_id);
+    
+    return {
+      ...t,
+      member_count: members.length,
+      leader_name: leader?.name || null,
+      leader_avatar: leader?.avatar || null,
+      monitor_name: monitor?.name || null,
+      monitor_avatar: monitor?.avatar || null
+    };
+  }) as Team[];
 
   console.log("api.ts: getTeams mapped data:", mappedTeams);
   return mappedTeams;
@@ -1051,182 +1044,4 @@ export async function seedInvestigationCase() {
     .insert(cluesToInsert);
   
   if (cluesError) throw cluesError;
-}
-
-// --- SOCIAL DEDUCTION GAME ---
-export async function getGameMatches(): Promise<GameMatch[]> {
-  const response = await fetch('/api/games/social-deduction/matches');
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch matches');
-  }
-  return response.json();
-}
-
-export async function createGameMatch(name: string): Promise<GameMatch> {
-  const response = await fetch('/api/games/social-deduction/matches', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name })
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to create match');
-  }
-  return response.json();
-}
-
-export async function joinGameMatch(matchId: string, userId: number, name: string, avatar?: string): Promise<GamePlayer> {
-  const response = await fetch('/api/games/social-deduction/join', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, userId, name, avatar })
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to join match');
-  }
-  return response.json();
-}
-
-export async function getGamePlayers(matchId: string): Promise<GamePlayer[]> {
-  const response = await fetch(`/api/games/social-deduction/players/${matchId}`);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch players');
-  }
-  return response.json();
-}
-
-export async function startGameMatch(matchId: string) {
-  const players = await getGamePlayers(matchId);
-  if (players.length < 3) throw new Error('Mínimo 3 jogadores para iniciar');
-
-  // Assign roles
-  const impostorCount = Math.max(1, Math.floor(players.length * 0.25));
-  const shuffled = [...players].sort(() => 0.5 - Math.random());
-  
-  const updates = shuffled.map((p, i) => ({
-    id: p.id,
-    role: i < impostorCount ? 'impostor' : 'crewmate'
-  }));
-
-  const response = await fetch('/api/games/social-deduction/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, players: updates })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to start match');
-  }
-}
-
-export async function getPlayerTasks(playerId: string): Promise<(GamePlayerTask & { task: GameTask })[]> {
-  const response = await fetch(`/api/games/social-deduction/player-tasks/${playerId}`);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch player tasks');
-  }
-  return response.json();
-}
-
-export async function completeGameTask(playerTaskId: string, playerId: string, matchId: string) {
-  const response = await fetch('/api/games/social-deduction/complete-task', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerTaskId, matchId })
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to complete task');
-  }
-
-  // Check if all tasks are completed
-  const players = await getGamePlayers(matchId);
-  const crewmateIds = players.filter(p => p.role === 'crewmate').map(p => p.id);
-  
-  const { data: matchTasks } = await supabase
-    .from('game_player_tasks')
-    .select('completed')
-    .in('player_id', crewmateIds);
-  
-  if (matchTasks && matchTasks.every(t => t.completed)) {
-    await endGameMatch(matchId, 'crewmate');
-  }
-}
-
-export async function killPlayer(targetPlayerId: string, killerPlayerId: string, matchId: string) {
-  const response = await fetch('/api/games/social-deduction/kill', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, killerId: killerPlayerId, victimId: targetPlayerId })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to kill player');
-  }
-}
-
-export async function reportBody(reporterId: string, matchId: string) {
-  const response = await fetch('/api/games/social-deduction/report', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, reporterId })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to report body');
-  }
-  return response.json();
-}
-
-export async function votePlayer(voterId: string, votedPlayerId: string | null, matchId: string, meetingId: string) {
-  const response = await fetch('/api/games/social-deduction/vote', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, voterId, votedPlayerId, meetingId })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to vote');
-  }
-}
-
-export async function getGameVotes(meetingId: string): Promise<GameVote[]> {
-  const response = await fetch(`/api/games/social-deduction/votes/${meetingId}`);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch votes');
-  }
-  return response.json();
-}
-
-export async function endGameMatch(matchId: string, winnerRole: 'crewmate' | 'impostor') {
-  const response = await fetch('/api/games/social-deduction/end', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, winnerRole })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to end match');
-  }
-
-  // Award points to winners
-  const players = await getGamePlayers(matchId);
-  const winners = players.filter(p => p.role === winnerRole);
-  
-  for (const winner of winners) {
-    // Award 50 points to each winner
-    await addPoints(winner.user_id, 50);
-  }
 }

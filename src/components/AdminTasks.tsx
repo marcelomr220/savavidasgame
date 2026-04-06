@@ -16,7 +16,8 @@ import {
   LayoutList,
   CheckSquare,
   Upload,
-  FileText
+  FileText,
+  Eye
 } from 'lucide-react';
 import { UserTask, Task } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,6 +31,8 @@ export default function AdminTasks() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isBulkUploading, setIsBulkUploading] = useState(false);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -135,6 +138,13 @@ export default function AdminTasks() {
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleOpenViewModal = (task: Task) => {
+    if (window.innerWidth >= 1024) {
+      setViewingTask(task);
+      setIsViewModalOpen(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -274,7 +284,28 @@ export default function AdminTasks() {
               </thead>
               <tbody className="divide-y divide-stone-50">
                 {pending.map((item) => (
-                  <tr key={item.id} className="hover:bg-stone-50/50 transition-colors">
+                  <tr 
+                    key={item.id} 
+                    className="hover:bg-stone-50/50 transition-colors cursor-pointer lg:cursor-default"
+                    onClick={() => {
+                      if (window.innerWidth >= 1024) {
+                        const taskObj = tasks.find(t => t.id === item.task_id);
+                        if (taskObj) handleOpenViewModal(taskObj);
+                        else {
+                          // If task not in list, create a partial one for viewing
+                          handleOpenViewModal({
+                            id: item.task_id,
+                            title: item.task_title,
+                            description: 'Carregando detalhes...',
+                            points: item.points,
+                            category: '',
+                            type: '',
+                            is_active: true
+                          });
+                        }
+                      }
+                    }}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500">
@@ -292,7 +323,7 @@ export default function AdminTasks() {
                         <span>{item.points}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleVerify(item.id, 'rejected')}
@@ -359,7 +390,11 @@ export default function AdminTasks() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {tasks.filter(t => t && typeof t === 'object').map((task) => (
-              <div key={task.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm hover:border-red-200 transition-all group">
+              <div 
+                key={task.id} 
+                onClick={() => handleOpenViewModal(task)}
+                className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm hover:border-red-200 transition-all group cursor-pointer lg:cursor-default"
+              >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-2">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -374,7 +409,7 @@ export default function AdminTasks() {
                       {task.type}
                     </span>
                   </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => handleOpenModal(task)} className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
                       <Edit2 size={18} />
                     </button>
@@ -571,6 +606,126 @@ export default function AdminTasks() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* View Task Modal */}
+      <AnimatePresence>
+        {isViewModalOpen && viewingTask && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsViewModalOpen(false)}
+              className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-[2rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center">
+                      <Eye size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-stone-900">Detalhes da Tarefa</h3>
+                      <p className="text-sm text-stone-500">Informações completas da tarefa.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsViewModalOpen(false)}
+                    className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-xl transition-all"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Título</h4>
+                    <p className="text-lg font-bold text-stone-900">{viewingTask.title}</p>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Descrição</h4>
+                    <p className="text-stone-600 leading-relaxed whitespace-pre-wrap">{viewingTask.description}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                      <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Pontuação</h4>
+                      <div className="flex items-center gap-1 text-red-600 font-bold">
+                        <Star size={16} fill="currentColor" />
+                        <span>{viewingTask.points} pts</span>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                      <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Categoria</h4>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        viewingTask.category === 'Culto' ? 'bg-blue-100 text-blue-700' :
+                        viewingTask.category === 'Célula' ? 'bg-red-100 text-red-700' :
+                        viewingTask.category === 'Especial' ? 'bg-purple-100 text-purple-700' :
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {viewingTask.category}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                      <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Tipo</h4>
+                      <p className="text-sm font-semibold text-stone-700">{viewingTask.type}</p>
+                    </div>
+                    <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                      <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Status</h4>
+                      <span className={`text-sm font-semibold ${viewingTask.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                        {viewingTask.is_active ? 'Ativa' : 'Inativa'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Prazos</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-stone-600">
+                        <Calendar size={14} className="text-stone-400" />
+                        <span>Início: {viewingTask.available_from ? safeFormatDate(viewingTask.available_from) : 'Imediato'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-stone-600">
+                        <Clock size={14} className="text-stone-400" />
+                        <span>Fim: {viewingTask.deadline ? safeFormatDate(viewingTask.deadline) : 'Sem prazo'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 pt-2">
+                    <button
+                      onClick={() => setIsViewModalOpen(false)}
+                      className="flex-1 px-6 py-4 bg-stone-100 text-stone-600 rounded-2xl font-bold hover:bg-stone-200 transition-all"
+                    >
+                      Fechar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsViewModalOpen(false);
+                        handleOpenModal(viewingTask);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200"
+                    >
+                      <Edit2 size={20} />
+                      Editar Tarefa
+                    </button>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
