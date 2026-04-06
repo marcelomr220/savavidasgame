@@ -20,18 +20,54 @@ try {
   console.log("Supabase client initialized successfully.");
 } catch (error) {
   // Minimal mock that handles common patterns without syntax errors
-  const mockResult = (data: any = null, error: any = null) => {
+  const inMemoryData: Record<string, any[]> = {
+    game_matches: [],
+    game_players: [],
+    game_tasks: [],
+    game_player_tasks: [],
+    game_events: [],
+    game_votes: [],
+  };
+
+  const mockResult = (table: string, data: any = null, error: any = null) => {
     const promise = Promise.resolve({ data, error });
     return Object.assign(promise, {
-      eq: () => mockResult(data, error),
-      select: () => mockResult(data, error),
-      single: () => mockResult(data, error),
-      order: () => mockResult(data, error),
-      limit: () => mockResult(data, error),
-      insert: () => mockResult(data, error),
-      update: () => mockResult(data, error),
-      delete: () => mockResult(data, error),
-      maybeSingle: () => mockResult(data, error),
+      eq: (col: string, val: any) => {
+        const filtered = (inMemoryData[table] || []).filter(item => item[col] === val);
+        return mockResult(table, filtered, error);
+      },
+      select: () => mockResult(table, inMemoryData[table] || [], error),
+      single: () => {
+        const d = Array.isArray(data) ? data[0] : data;
+        return Promise.resolve({ data: d, error });
+      },
+      maybeSingle: () => {
+        const d = Array.isArray(data) ? data[0] : data;
+        return Promise.resolve({ data: d, error: null });
+      },
+      order: () => mockResult(table, data, error),
+      limit: () => mockResult(table, data, error),
+      insert: (items: any[]) => {
+        const newItems = items.map(item => ({ 
+          id: Math.random().toString(36).substr(2, 9), 
+          created_at: new Date().toISOString(),
+          ...item 
+        }));
+        if (!inMemoryData[table]) inMemoryData[table] = [];
+        inMemoryData[table].push(...newItems);
+        return mockResult(table, newItems, error);
+      },
+      update: (updateData: any) => {
+        if (Array.isArray(data)) {
+          data.forEach(item => Object.assign(item, updateData));
+        }
+        return mockResult(table, data, error);
+      },
+      delete: () => {
+        // Simple delete: clear the table for now
+        inMemoryData[table] = [];
+        return mockResult(table, [], error);
+      },
     });
   };
 
@@ -43,8 +79,13 @@ try {
       signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
       signOut: async () => ({ error: null }),
     },
-    from: () => mockResult([], { message: 'Supabase not configured' }),
+    from: (table: string) => mockResult(table),
     rpc: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+    channel: () => ({
+      on: function() { return this; },
+      subscribe: () => ({})
+    }),
+    removeChannel: () => ({}),
   } as any;
 }
 

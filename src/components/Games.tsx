@@ -8,10 +8,12 @@ import {
   TreeDeciduous,
   ChevronRight,
   Star,
-  Search
+  Search,
+  Users
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { User } from '../types';
+import { getAppSettings, getTeams } from '../services/api';
 
 // Game Components
 import Quiz from './games/Quiz';
@@ -19,10 +21,33 @@ import MemoryGame from './games/MemoryGame';
 import PastorAdventure from './games/PastorAdventure';
 import KingdomTree from './games/KingdomTree';
 import InvestigationMode from './InvestigationMode';
+import SocialDeductionGame from './games/SocialDeductionGame';
 
 export default function Games({ user, onUpdateUser }: { user: User, onUpdateUser?: () => void }) {
   const location = useLocation();
   const isMain = location.pathname === '/games';
+  const [gameEnabled, setGameEnabled] = React.useState(false);
+  const [leadersOnly, setLeadersOnly] = React.useState(false);
+  const [isLeader, setIsLeader] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkGameSettings = async () => {
+      const enabled = await getAppSettings('social_deduction_game_enabled');
+      setGameEnabled(enabled === 'true');
+
+      const onlyLeaders = await getAppSettings('social_deduction_game_leaders_only');
+      setLeadersOnly(onlyLeaders === 'true');
+
+      if (onlyLeaders === 'true') {
+        const teams = await getTeams();
+        const userIsLeader = teams.some(team => team.leader_id === user.id);
+        setIsLeader(userIsLeader);
+      }
+    };
+    checkGameSettings();
+  }, [user.id]);
+
+  const canPlaySocialDeduction = gameEnabled && (!leadersOnly || isLeader || user.role === 'admin');
 
   const gameList = [
     { 
@@ -72,6 +97,18 @@ export default function Games({ user, onUpdateUser }: { user: User, onUpdateUser
     },
   ];
 
+  if (canPlaySocialDeduction) {
+    gameList.push({
+      id: 'social-deduction',
+      title: 'Infiltrados no Reino',
+      desc: 'Descubra quem é o infiltrado antes que seja tarde demais!',
+      icon: Users,
+      color: 'bg-red-600',
+      points: '50 pts/vitória',
+      path: '/games/social-deduction'
+    });
+  }
+
   if (!isMain) {
     return (
       <div className="space-y-6">
@@ -85,6 +122,9 @@ export default function Games({ user, onUpdateUser }: { user: User, onUpdateUser
           <Route path="memory" element={<MemoryGame user={user} onUpdateUser={onUpdateUser} />} />
           <Route path="adventure" element={<PastorAdventure user={user} onUpdateUser={onUpdateUser} />} />
           <Route path="investigation" element={<InvestigationMode user={user} />} />
+          {canPlaySocialDeduction && (
+            <Route path="social-deduction" element={<SocialDeductionGame user={user} onUpdateUser={onUpdateUser} />} />
+          )}
         </Routes>
       </div>
     );

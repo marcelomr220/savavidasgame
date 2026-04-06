@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Image, Save, Loader2, AlertCircle, CheckCircle2, Flame } from 'lucide-react';
+import { Settings, Image, Save, Loader2, AlertCircle, CheckCircle2, Flame, Gamepad2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getAppSettings, updateAppSettings } from '../services/api';
 
 export default function AdminSettings() {
   const [logoUrl, setLogoUrl] = useState('');
   const [splashUrl, setSplashUrl] = useState('');
+  const [gameEnabled, setGameEnabled] = useState(false);
+  const [gameLeadersOnly, setGameLeadersOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -18,6 +20,12 @@ export default function AdminSettings() {
         
         const splash = await getAppSettings('splash_logo');
         if (splash) setSplashUrl(splash);
+
+        const game = await getAppSettings('social_deduction_game_enabled');
+        setGameEnabled(game === 'true');
+
+        const leadersOnly = await getAppSettings('social_deduction_game_leaders_only');
+        setGameLeadersOnly(leadersOnly === 'true');
       } catch (err) {
         console.error("Error fetching settings:", err);
       } finally {
@@ -35,6 +43,8 @@ export default function AdminSettings() {
     try {
       await updateAppSettings('login_logo', logoUrl);
       await updateAppSettings('splash_logo', splashUrl);
+      await updateAppSettings('social_deduction_game_enabled', gameEnabled.toString());
+      await updateAppSettings('social_deduction_game_leaders_only', gameLeadersOnly.toString());
       setMessage({ type: 'success', text: 'Configurações salvas com sucesso!' });
     } catch (err: any) {
       console.error("Error saving settings:", err);
@@ -144,6 +154,44 @@ export default function AdminSettings() {
                 <p className="text-xs text-stone-400">Esta imagem ou GIF será exibido quando o app for aberto.</p>
                 <p className="text-xs text-stone-400 font-medium text-orange-600">Dica: Use um GIF animado para uma abertura mais dinâmica!</p>
               </div>
+            </div>
+          </section>
+
+          <hr className="border-stone-100" />
+
+          {/* Games Section */}
+          <section className="space-y-6">
+            <h3 className="font-bold text-stone-900 flex items-center gap-2">
+              <Gamepad2 size={20} className="text-red-600" />
+              Configurações de Games
+            </h3>
+            
+            <div className="flex items-center justify-between p-4 bg-stone-50 rounded-2xl border border-stone-100">
+              <div>
+                <p className="font-bold text-stone-900">Infiltrados no Reino (Among Us)</p>
+                <p className="text-xs text-stone-500">Habilitar ou desabilitar o jogo de dedução social.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGameEnabled(!gameEnabled)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${gameEnabled ? 'bg-red-600' : 'bg-stone-300'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${gameEnabled ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-stone-50 rounded-2xl border border-stone-100">
+              <div>
+                <p className="font-bold text-stone-900">Apenas Líderes de Equipe</p>
+                <p className="text-xs text-stone-500">Restringir o jogo Infiltrados no Reino apenas para líderes.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGameLeadersOnly(!gameLeadersOnly)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${gameLeadersOnly ? 'bg-red-600' : 'bg-stone-300'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${gameLeadersOnly ? 'left-7' : 'left-1'}`} />
+              </button>
             </div>
           </section>
 

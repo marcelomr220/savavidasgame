@@ -11,6 +11,29 @@
     <meta name="apple-mobile-web-app-title" content="Salva Vidas Game" />
     <link rel="apple-touch-icon" href="https://picsum.photos/seed/church/192/192" />
     <link rel="icon" href="https://picsum.photos/seed/church/32/32" />
+    <script>
+      // Polyfill global and process for libraries that expect them
+      if (typeof global === 'undefined') {
+        window.global = window;
+      }
+      if (typeof process === 'undefined') {
+        window.process = { env: {} };
+      }
+      // Protect fetch from being overwritten if it's a read-only getter
+      try {
+        const originalFetch = window.fetch;
+        Object.defineProperty(window, 'fetch', {
+          configurable: true,
+          enumerable: true,
+          get: () => originalFetch,
+          set: (v) => {
+            console.warn('Attempt to overwrite read-only fetch ignored');
+          }
+        });
+      } catch (e) {
+        console.warn('Could not protect fetch:', e);
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

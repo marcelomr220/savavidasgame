@@ -176,3 +176,55 @@ export interface UserInvestigationNotification {
   notification_id: string;
   seen_at: string;
 }
+
+// --- SOCIAL DEDUCTION GAME ---
+export interface GameMatch {
+  id: string;
+  name: string;
+  status: 'waiting' | 'in_progress' | 'finished';
+  winner_role?: 'crewmate' | 'impostor';
+  created_at: string;
+}
+
+export interface GamePlayer {
+  id: string;
+  user_id: number;
+  match_id: string;
+  name: string;
+  avatar?: string;
+  role: 'crewmate' | 'impostor' | null;
+  is_alive: boolean;
+  created_at: string;
+}
+
+export interface GameTask {
+  id: string;
+  match_id: string;
+  title: string;
+  description: string;
+  points: number;
+}
+
+export interface GamePlayerTask {
+  id: string;
+  player_id: string;
+  task_id: string;
+  completed: boolean;
+}
+
+export interface GameEvent {
+  id: string;
+  match_id: string;
+  type: 'kill' | 'report' | 'meeting' | 'sabotage';
+  created_by: string;
+  created_at: string;
+  details?: any;
+}
+
+export interface GameVote {
+  id: string;
+  match_id: string;
+  voter_id: string;
+  voted_player_id: string | null;
+  meeting_id: string;
+}
