@@ -888,7 +888,7 @@ export async function submitInvestigationAnswer(userId: number, teamId: number, 
       case_id: caseId,
       team_id: teamId,
       action_type: 'correct_answer',
-      description: 'Equipe acertou o enigma',
+      description: `Equipe desvendou o mistério com a resposta: "${answer.trim()}"`,
       points_spent: 0
     }]);
   } else {
@@ -896,7 +896,7 @@ export async function submitInvestigationAnswer(userId: number, teamId: number, 
       case_id: caseId,
       team_id: teamId,
       action_type: 'answer_attempt',
-      description: 'Equipe tentou uma resposta',
+      description: `Equipe tentou a resposta: "${answer.trim()}"`,
       points_spent: 0
     }]);
 
@@ -986,6 +986,51 @@ export async function addPointsToTeam(teamId: number, amount: number) {
   const { error } = await supabase.rpc('increment_team_points', { row_id: teamId, amount });
   if (error) throw error;
   return true;
+}
+
+export async function getAllInvestigationAttempts(caseId: string): Promise<any[]> {
+  // 1. Fetch all teams to get names and colors
+  const { data: teams, error: teamsError } = await supabase
+    .from('teams')
+    .select('id, name, color');
+  
+  if (teamsError) throw teamsError;
+
+  // 2. Fetch all attempts for this case
+  const { data: attempts, error: attemptsError } = await supabase
+    .from('investigation_team_attempts')
+    .select('*')
+    .eq('case_id', caseId);
+  
+  if (attemptsError) throw attemptsError;
+
+  // 3. Fetch all answers for this case
+  const { data: answers, error: answersError } = await supabase
+    .from('team_answers')
+    .select('*')
+    .eq('case_id', caseId)
+    .order('created_at', { ascending: true });
+  
+  if (answersError) throw answersError;
+
+  // 4. Map everything together
+  return (teams || []).map(team => {
+    const attempt = (attempts || []).find(a => a.team_id === team.id);
+    const teamAnswers = (answers || []).filter(a => a.team_id === team.id);
+    
+    // Only return teams that have at least one attempt or answer
+    if (!attempt && teamAnswers.length === 0) return null;
+
+    return {
+      id: attempt?.id || `temp-${team.id}`,
+      team_id: team.id,
+      team_name: team.name,
+      team_color: team.color,
+      attempts_used: attempt?.attempts_used || teamAnswers.length,
+      is_eliminated: attempt?.is_eliminated || false,
+      answers: teamAnswers
+    };
+  }).filter(Boolean);
 }
 
 export async function seedInvestigationCase() {

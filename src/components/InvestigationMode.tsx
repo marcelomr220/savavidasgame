@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, InvestigationCase, InvestigationClue, InvestigationHint, InvestigationNotification, InvestigationTeamLog, InvestigationTeamAttempt, Team } from '../types';
 import { supabase } from '../lib/supabase';
-import { purchaseInvestigationHint, addPointsToTeam, getPurchasedHints, submitInvestigationAnswer, getInvestigationRanking, getInvestigationTeamLogs, getInvestigationTeamAttempt } from '../services/api';
+import { purchaseInvestigationHint, addPointsToTeam, getPurchasedHints, submitInvestigationAnswer, getInvestigationRanking, getInvestigationTeamLogs, getInvestigationTeamAttempt, getAllInvestigationAttempts } from '../services/api';
 
 export default function InvestigationMode({ user }: { user: User }) {
   const [cases, setCases] = useState<InvestigationCase[]>([]);
@@ -30,6 +30,9 @@ export default function InvestigationMode({ user }: { user: User }) {
   const [purchasedHintIds, setPurchasedHintIds] = useState<string[]>([]);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [ranking, setRanking] = useState<any[]>([]);
+  const [allAttempts, setAllAttempts] = useState<any[]>([]);
+  const [globalFeed, setGlobalFeed] = useState<any[]>([]);
+  const [myTeamAnswers, setMyTeamAnswers] = useState<any[]>([]);
   const [teamLogs, setTeamLogs] = useState<InvestigationTeamLog[]>([]);
   const [teamAttempt, setTeamAttempt] = useState<InvestigationTeamAttempt | null>(null);
   const [userTeam, setUserTeam] = useState<Team | null>(null);
@@ -82,6 +85,24 @@ export default function InvestigationMode({ user }: { user: User }) {
     try {
       const data = await getInvestigationRanking(caseId);
       setRanking(data);
+      
+      const attemptsData = await getAllInvestigationAttempts(caseId);
+      setAllAttempts(attemptsData);
+
+      // Create a global feed of all answers
+      const feed = attemptsData.flatMap(attempt => 
+        attempt.answers.map((ans: any) => ({
+          ...ans,
+          team_name: attempt.team_name,
+          team_color: attempt.team_color
+        }))
+      ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setGlobalFeed(feed);
+
+      if (user.team_id) {
+        const myTeam = attemptsData.find(a => a.team_id === user.team_id);
+        setMyTeamAnswers(myTeam?.answers || []);
+      }
     } catch (error) {
       console.error('Error fetching ranking:', error);
     }
@@ -253,15 +274,21 @@ export default function InvestigationMode({ user }: { user: User }) {
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'investigation_team_attempts' }, (payload) => {
-        if (payload.new.case_id === activeCase.id && payload.new.team_id === user.team_id) {
-          setTeamAttempt(payload.new as InvestigationTeamAttempt);
-          setAttemptsCount(payload.new.attempts_used);
+        if (payload.new.case_id === activeCase.id) {
+          fetchRanking(activeCase.id);
+          if (payload.new.team_id === user.team_id) {
+            setTeamAttempt(payload.new as InvestigationTeamAttempt);
+            setAttemptsCount(payload.new.attempts_used);
+          }
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'investigation_team_attempts' }, (payload) => {
-        if (payload.new.case_id === activeCase.id && payload.new.team_id === user.team_id) {
-          setTeamAttempt(payload.new as InvestigationTeamAttempt);
-          setAttemptsCount(payload.new.attempts_used);
+        if (payload.new.case_id === activeCase.id) {
+          fetchRanking(activeCase.id);
+          if (payload.new.team_id === user.team_id) {
+            setTeamAttempt(payload.new as InvestigationTeamAttempt);
+            setAttemptsCount(payload.new.attempts_used);
+          }
         }
       })
       .subscribe();
@@ -552,123 +579,229 @@ export default function InvestigationMode({ user }: { user: User }) {
               )}
             </div>
           </div>
+
+          {/* Team Status & Answer Form */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8 border-t border-stone-100">
+            {user.team_id && (
+              <section className="bg-white p-8 rounded-[40px] border border-stone-100 shadow-sm space-y-6 h-fit">
+                <h3 className="font-bold text-stone-900 flex items-center gap-2">
+                  <ShieldAlert className="text-red-500" /> Status da Equipe
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                    <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">Tentativas</p>
+                    <p className="text-xl font-black text-stone-900">
+                      {activeCase.max_attempts - (teamAttempt?.attempts_used || 0)} <span className="text-xs text-stone-400">restantes</span>
+                    </p>
+                  </div>
+                  <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                    <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">Situação</p>
+                    {teamAttempt?.is_eliminated ? (
+                      <p className="text-sm font-black text-red-600 uppercase">❌ Eliminada</p>
+                    ) : hasSolved ? (
+                      <p className="text-sm font-black text-green-600 uppercase">✅ Resolvido</p>
+                    ) : (
+                      <p className="text-sm font-black text-blue-600 uppercase">🔍 Ativa</p>
+                    )}
+                  </div>
+                </div>
+
+                {userTeam?.monitor_id === user.id ? (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 text-green-700 rounded-xl text-xs font-bold border border-green-100">
+                    <UserCheck size={14} /> Você é o monitor desta equipe
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold border border-amber-100">
+                    <Lock size={14} /> Apenas o monitor pode responder
+                  </div>
+                )}
+
+                {myTeamAnswers.length > 0 && (
+                  <div className="space-y-3 pt-4 border-t border-stone-50">
+                    <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest px-1">Suas Tentativas Anteriores</p>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                      {myTeamAnswers.map((ans, idx) => (
+                        <div key={ans.id} className={`p-3 rounded-2xl border text-sm ${
+                          ans.is_correct ? 'bg-green-50 border-green-100 text-green-800' : 'bg-stone-50 border-stone-100 text-stone-600'
+                        }`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-black text-[10px] uppercase opacity-50">{idx + 1}ª Tentativa</span>
+                            <span className="text-[10px] opacity-50">{new Date(ans.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <p className="font-bold uppercase">{ans.answer_text || ans.answer}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Answer Form */}
+            {!teamAttempt?.is_eliminated ? (
+              <section className={`p-8 rounded-[40px] shadow-xl space-y-6 h-fit ${hasSolved ? 'bg-green-50 border border-green-100' : 'bg-white border border-stone-100'}`}>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-stone-900 flex items-center gap-2">
+                    {hasSolved ? <CheckCircle2 className="text-green-600" /> : <Key className="text-stone-400" />}
+                    {hasSolved ? 'Resolvido!' : 'Sua Resposta'}
+                  </h3>
+                </div>
+
+                {hasSolved ? (
+                  <div className="space-y-4">
+                    <p className="text-green-700 font-medium">Sua equipe já desvendou este mistério. Bom trabalho!</p>
+                    <div className="p-4 bg-white/50 rounded-2xl text-center">
+                      <p className="text-xs font-black text-green-600 uppercase mb-1">Resposta</p>
+                      <p className="text-xl font-black text-green-800 uppercase">{activeCase.answer}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-xs font-black text-stone-400 uppercase tracking-widest">Sua Resposta</label>
+                      {activeCase.max_attempts && (
+                        <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                          Tentativas: {attemptsCount}/{activeCase.max_attempts}
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      placeholder={userTeam?.monitor_id !== user.id ? "Apenas o monitor pode responder" : "Digite sua resposta..."}
+                      disabled={isSubmitting || (activeCase.max_attempts ? attemptsCount >= activeCase.max_attempts : false) || userTeam?.monitor_id !== user.id}
+                      className="w-full px-6 py-4 bg-stone-50 border-2 border-stone-100 rounded-2xl focus:outline-none focus:border-stone-900 transition-all font-bold uppercase disabled:opacity-60"
+                    />
+                    {userTeam?.monitor_id === user.id && (
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || !answer.trim() || (activeCase.max_attempts ? attemptsCount >= activeCase.max_attempts : false)}
+                        className="w-full py-4 bg-stone-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all disabled:opacity-50"
+                      >
+                        <Send size={18} /> {isSubmitting ? 'Enviando...' : 'Enviar Resposta'}
+                      </button>
+                    )}
+                  </form>
+                )}
+
+                {feedback && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${
+                      feedback.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    {feedback.text}
+                  </motion.div>
+                )}
+              </section>
+            ) : (
+              <section className="bg-red-50 p-8 rounded-[40px] border border-red-100 shadow-xl text-center space-y-4 h-fit">
+                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto">
+                  <ShieldAlert size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-red-900">Equipe Desclassificada</h3>
+                  <p className="text-red-700 text-sm">Sua equipe excedeu o limite de {activeCase.max_attempts} tentativas e foi eliminada deste caso.</p>
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* Global Status Panels (Feed & All Teams) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
+            {/* Global Answer Feed */}
+            <section className="bg-white p-8 rounded-[40px] border border-stone-100 shadow-sm space-y-6">
+              <h3 className="font-bold text-stone-900 flex items-center gap-2">
+                <History className="text-red-500" /> Feed Global de Respostas
+              </h3>
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {globalFeed.map((ans) => (
+                  <div key={ans.id} className="p-4 rounded-2xl bg-stone-50 border border-stone-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ans.team_color }} />
+                        <span className="text-xs font-black text-stone-900 uppercase">{ans.team_name}</span>
+                      </div>
+                      <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                        ans.is_correct ? 'bg-green-100 text-green-600' : 'bg-stone-200 text-stone-500'
+                      }`}>
+                        {ans.is_correct ? 'Acertou' : 'Tentativa'}
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-stone-700 uppercase leading-tight">
+                      {ans.answer_text || ans.answer}
+                    </p>
+                    <p className="text-[8px] text-stone-400 font-bold uppercase text-right">
+                      {new Date(ans.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                    </p>
+                  </div>
+                ))}
+                {globalFeed.length === 0 && (
+                  <p className="text-center text-stone-400 text-sm italic py-4">Nenhuma resposta enviada ainda.</p>
+                )}
+              </div>
+            </section>
+
+            {/* All Teams Status */}
+            <section className="bg-white p-8 rounded-[40px] border border-stone-100 shadow-sm space-y-6">
+              <h3 className="font-bold text-stone-900 flex items-center gap-2">
+                <ShieldAlert className="text-stone-400" /> Status das Equipes
+              </h3>
+              <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {allAttempts.map((attempt) => (
+                  <div key={attempt.id} className="space-y-3 p-4 rounded-3xl bg-stone-50 border border-stone-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: attempt.team_color }} />
+                        <p className="font-bold text-stone-900">{attempt.team_name}</p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                        attempt.is_eliminated ? 'bg-red-100 text-red-600' : 
+                        attempt.answers.some((a: any) => a.is_correct) ? 'bg-green-100 text-green-600' : 
+                        'bg-blue-100 text-blue-600'
+                      }`}>
+                        {attempt.is_eliminated ? 'Eliminada' : 
+                         attempt.answers.some((a: any) => a.is_correct) ? 'Resolvido' : 
+                         'Em Investigação'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-[10px] font-black text-stone-400 uppercase tracking-widest px-1">
+                      <span>Tentativas: {attempt.attempts_used}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {attempt.answers.map((ans: any, aIdx: number) => (
+                        <div key={ans.id} className="flex items-start gap-2 text-xs">
+                          <span className="text-stone-400 font-bold mt-0.5">{aIdx + 1}º</span>
+                          <div className={`flex-1 p-2 rounded-xl border ${
+                            ans.is_correct ? 'bg-green-50 border-green-100 text-green-800' : 'bg-white border-stone-100 text-stone-600'
+                          }`}>
+                            <p className="font-medium">{ans.answer_text || ans.answer}</p>
+                            <p className="text-[8px] opacity-60 mt-0.5">
+                              {new Date(ans.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {allAttempts.length === 0 && (
+                  <p className="text-center text-stone-400 text-sm italic py-4">Nenhuma tentativa registrada.</p>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
 
         {/* Answer & Ranking */}
         <div className="space-y-8">
-          {/* Team Status */}
-          {user.team_id && (
-            <section className="bg-white p-8 rounded-[40px] border border-stone-100 shadow-sm space-y-6">
-              <h3 className="font-bold text-stone-900 flex items-center gap-2">
-                <ShieldAlert className="text-red-500" /> Status da Equipe
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
-                  <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">Tentativas</p>
-                  <p className="text-xl font-black text-stone-900">
-                    {activeCase.max_attempts - (teamAttempt?.attempts_used || 0)} <span className="text-xs text-stone-400">restantes</span>
-                  </p>
-                </div>
-                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100">
-                  <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">Situação</p>
-                  {teamAttempt?.is_eliminated ? (
-                    <p className="text-sm font-black text-red-600 uppercase">❌ Eliminada</p>
-                  ) : hasSolved ? (
-                    <p className="text-sm font-black text-green-600 uppercase">✅ Resolvido</p>
-                  ) : (
-                    <p className="text-sm font-black text-blue-600 uppercase">🔍 Ativa</p>
-                  )}
-                </div>
-              </div>
-
-              {userTeam?.monitor_id === user.id ? (
-                <div className="flex items-center gap-2 p-3 bg-green-50 text-green-700 rounded-xl text-xs font-bold border border-green-100">
-                  <UserCheck size={14} /> Você é o monitor desta equipe
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold border border-amber-100">
-                  <Lock size={14} /> Apenas o monitor pode responder
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* Answer Form */}
-          {!teamAttempt?.is_eliminated && (
-            <section className={`p-8 rounded-[40px] shadow-xl space-y-6 ${hasSolved ? 'bg-green-50 border border-green-100' : 'bg-white border border-stone-100'}`}>
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-stone-900 flex items-center gap-2">
-                  {hasSolved ? <CheckCircle2 className="text-green-600" /> : <Key className="text-stone-400" />}
-                  {hasSolved ? 'Resolvido!' : 'Sua Resposta'}
-                </h3>
-              </div>
-
-              {hasSolved ? (
-                <div className="space-y-4">
-                  <p className="text-green-700 font-medium">Sua equipe já desvendou este mistério. Bom trabalho!</p>
-                  <div className="p-4 bg-white/50 rounded-2xl text-center">
-                    <p className="text-xs font-black text-green-600 uppercase mb-1">Resposta</p>
-                    <p className="text-xl font-black text-green-800 uppercase">{activeCase.answer}</p>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="flex items-center justify-between px-1">
-                    <label className="text-xs font-black text-stone-400 uppercase tracking-widest">Sua Resposta</label>
-                    {activeCase.max_attempts && (
-                      <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
-                        Tentativas: {attemptsCount}/{activeCase.max_attempts}
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    placeholder={userTeam?.monitor_id !== user.id ? "Apenas o monitor pode responder" : "Digite sua resposta..."}
-                    disabled={isSubmitting || (activeCase.max_attempts ? attemptsCount >= activeCase.max_attempts : false) || userTeam?.monitor_id !== user.id}
-                    className="w-full px-6 py-4 bg-stone-50 border-2 border-stone-100 rounded-2xl focus:outline-none focus:border-stone-900 transition-all font-bold uppercase disabled:opacity-60"
-                  />
-                  {userTeam?.monitor_id === user.id && (
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || !answer.trim() || (activeCase.max_attempts ? attemptsCount >= activeCase.max_attempts : false)}
-                      className="w-full py-4 bg-stone-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all disabled:opacity-50"
-                    >
-                      <Send size={18} /> {isSubmitting ? 'Enviando...' : 'Enviar Resposta'}
-                    </button>
-                  )}
-                </form>
-              )}
-
-              {feedback && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${
-                    feedback.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  }`}
-                >
-                  {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                  {feedback.text}
-                </motion.div>
-              )}
-            </section>
-          )}
-
-          {teamAttempt?.is_eliminated && (
-            <section className="bg-red-50 p-8 rounded-[40px] border border-red-100 shadow-xl text-center space-y-4">
-              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto">
-                <ShieldAlert size={32} />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-red-900">Equipe Desclassificada</h3>
-                <p className="text-red-700 text-sm">Sua equipe excedeu o limite de {activeCase.max_attempts} tentativas e foi eliminada deste caso.</p>
-              </div>
-            </section>
-          )}
-
           {/* Game History */}
           <section className="bg-white p-8 rounded-[40px] border border-stone-100 shadow-sm space-y-6">
             <h3 className="font-bold text-stone-900 flex items-center gap-2">
