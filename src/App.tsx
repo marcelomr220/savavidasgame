@@ -150,6 +150,32 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  if (user?.is_disabled) {
+    return (
+      <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-24 h-24 bg-red-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-red-900/50 mx-auto mb-6">
+            <X size={48} />
+          </div>
+          <h1 className="text-3xl font-black text-white tracking-tighter mb-4">CONTA DESATIVADA</h1>
+          <p className="text-stone-400 font-medium mb-8">
+            Sua conta foi desativada por um administrador. Entre em contato com a liderança para mais informações.
+          </p>
+          <button
+            onClick={handleLogout}
+            className="px-8 py-3 bg-white text-stone-900 rounded-xl font-bold hover:bg-stone-100 transition-all"
+          >
+            Sair da Conta
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   const isAdmin = user?.role === 'admin';
 
   const navItems = [

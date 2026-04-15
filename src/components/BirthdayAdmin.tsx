@@ -17,7 +17,7 @@ export default function BirthdayAdmin() {
   const fetchUsers = async () => {
     try {
       const data = await getUsers();
-      setUsers(data);
+      setUsers(data.filter(u => !u.is_disabled));
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {

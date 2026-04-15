@@ -96,7 +96,7 @@ export default function Dashboard({ user }: { user: User }) {
       if (usersError) throw usersError;
 
       const birthdayUsers = (users || []).filter(user => {
-        if (!user.birth_date) return false;
+        if (!user.birth_date || user.is_disabled) return false;
         const bDate = new Date(user.birth_date);
         return bDate.getUTCDate() === day && (bDate.getUTCMonth() + 1) === month;
       });

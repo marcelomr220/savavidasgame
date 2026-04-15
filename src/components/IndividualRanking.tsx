@@ -19,7 +19,8 @@ export default function IndividualRanking({ user }: { user: User }) {
     if (activeTab === 'individual') {
       getUsers()
         .then(data => {
-          setRankings(Array.isArray(data) ? data : []);
+          const activeUsers = (Array.isArray(data) ? data : []).filter(u => !u.is_disabled);
+          setRankings(activeUsers);
           setLoading(false);
         })
         .catch(err => {

@@ -11,6 +11,7 @@ export interface User {
   role: 'user' | 'admin';
   birth_date?: string;
   last_activity_at?: string;
+  is_disabled?: boolean;
 }
 
 export interface BirthdayMessage {

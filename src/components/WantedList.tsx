@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, MessageCircle, User as UserIcon, Clock, AlertTriangle } from 'lucide-react';
 import { User } from '../types';
 import { supabase } from '../lib/supabase';
+import { getUsers } from '../services/api';
 
 interface WantedUser extends User {
   daysAbsent: number;
@@ -22,12 +23,10 @@ export default function WantedList() {
       setLoading(true);
       
       // 1. Get all users
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('role', 'user');
-
-      if (usersError) throw usersError;
+      const users = await getUsers(false);
+      
+      // Filter for only 'user' role
+      const regularUsers = users.filter(u => u.role === 'user');
 
       // 2. Get latest attendance for each user
       // In a real app, we might have a 'last_attendance_at' column in users table
@@ -51,7 +50,7 @@ export default function WantedList() {
       // IDs to exclude from the wanted list (per user request)
       const excludedUserIds = [36, 26, 46, 47, 30, 32, 31];
 
-      const processed: WantedUser[] = (users || [])
+      const processed: WantedUser[] = regularUsers
         .filter(u => !excludedUserIds.includes(u.id))
         .map(u => {
           const lastAtt = userLastAttendance[u.id];

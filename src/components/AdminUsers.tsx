@@ -21,7 +21,8 @@ export default function AdminUsers() {
     points: 0,
     level: 1,
     streak: 0,
-    birth_date: ''
+    birth_date: '',
+    is_disabled: false
   });
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function AdminUsers() {
 
   const fetchUsers = async () => {
     try {
-      const data = await getUsers();
+      const data = await getUsers(true);
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -70,7 +71,8 @@ export default function AdminUsers() {
         points: user.points,
         level: user.level,
         streak: user.streak,
-        birth_date: user.birth_date || ''
+        birth_date: user.birth_date || '',
+        is_disabled: user.is_disabled || false
       });
     } else {
       setEditingUser(null);
@@ -83,7 +85,8 @@ export default function AdminUsers() {
         points: 0,
         level: 1,
         streak: 0,
-        birth_date: ''
+        birth_date: '',
+        is_disabled: false
       });
     }
     setIsModalOpen(true);
@@ -168,6 +171,7 @@ export default function AdminUsers() {
                 <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Usuário</th>
                 <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Equipe</th>
                 <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Pontos</th>
+                <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Papel</th>
                 <th className="px-6 py-4 text-xs font-bold text-stone-400 uppercase tracking-wider text-right">Ações</th>
               </tr>
@@ -194,6 +198,13 @@ export default function AdminUsers() {
                       <Star size={14} fill="currentColor" />
                       <span>{u.points}</span>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                      u.is_disabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                    }`}>
+                      {u.is_disabled ? 'Desativado' : 'Ativo'}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
@@ -315,6 +326,18 @@ export default function AdminUsers() {
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer p-3 bg-stone-50 border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_disabled}
+                        onChange={(e) => setFormData({ ...formData, is_disabled: e.target.checked })}
+                        className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                      />
+                      <span className="text-sm font-bold text-stone-700">Usuário Desativado</span>
+                    </label>
+                    <p className="text-[10px] text-stone-400 mt-1 ml-6 italic">Usuários desativados ficam invisíveis no ranking e não podem acessar o app.</p>
                   </div>
                 </div>
 

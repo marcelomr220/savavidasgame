@@ -25,6 +25,7 @@ CREATE TABLE users (
   level INTEGER DEFAULT 1,
   streak INTEGER DEFAULT 0,
   role TEXT DEFAULT 'user',
+  is_disabled BOOLEAN DEFAULT FALSE,
   birth_date DATE,
   last_login TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()

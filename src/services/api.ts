@@ -37,18 +37,38 @@ export async function register(name: string, email: string, password: string): P
 }
 
 // --- USERS ---
-export async function getUsers(): Promise<User[]> {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*, teams!team_id(name)')
-    .order('points', { ascending: false });
-  
-  if (error) throw error;
-  
-  return (data || []).map(u => ({
-    ...u,
-    team_name: u.teams?.name || null
-  })) as User[];
+export async function getUsers(includeDisabled: boolean = false): Promise<User[]> {
+  try {
+    let query = supabase
+      .from('users')
+      .select('*, teams!team_id(name)')
+      .order('points', { ascending: false });
+    
+    if (!includeDisabled) {
+      query = query.eq('is_disabled', false);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    return (data || []).map(u => ({
+      ...u,
+      team_name: u.teams?.name || null
+    })) as User[];
+  } catch (error) {
+    // Fallback if column doesn't exist
+    const { data, error: fetchError } = await supabase
+      .from('users')
+      .select('*, teams!team_id(name)')
+      .order('points', { ascending: false });
+    
+    if (fetchError) throw fetchError;
+    
+    return (data || []).map(u => ({
+      ...u,
+      team_name: u.teams?.name || null
+    })) as User[];
+  }
 }
 
 export async function getUserById(id: string | number): Promise<User> {
@@ -222,23 +242,46 @@ export async function getTasks(isAdmin: boolean = false): Promise<Task[]> {
 }
 
 export async function getPendingTasks(): Promise<UserTask[]> {
-  const { data, error } = await supabase
-    .from('user_tasks')
-    .select(`
-      *,
-      users (name),
-      tasks (title, points)
-    `)
-    .eq('status', 'pending');
+  try {
+    const { data, error } = await supabase
+      .from('user_tasks')
+      .select(`
+        *,
+        users (name, is_disabled),
+        tasks (title, points)
+      `)
+      .eq('status', 'pending');
 
-  if (error) throw error;
+    if (error) throw error;
 
-  return (data || []).map(p => ({
-    ...p,
-    user_name: p.users?.name,
-    task_title: p.tasks?.title,
-    task_points: p.tasks?.points
-  })) as UserTask[];
+    return (data || [])
+      .filter(p => !p.users?.is_disabled)
+      .map(p => ({
+        ...p,
+        user_name: p.users?.name,
+        task_title: p.tasks?.title,
+        task_points: p.tasks?.points
+      })) as UserTask[];
+  } catch (error) {
+    // Fallback if is_disabled column doesn't exist
+    const { data, error: fetchError } = await supabase
+      .from('user_tasks')
+      .select(`
+        *,
+        users (name),
+        tasks (title, points)
+      `)
+      .eq('status', 'pending');
+
+    if (fetchError) throw fetchError;
+
+    return (data || []).map(p => ({
+      ...p,
+      user_name: p.users?.name,
+      task_title: p.tasks?.title,
+      task_points: p.tasks?.points
+    })) as UserTask[];
+  }
 }
 
 export async function addPoints(userId: number, amount: number) {
@@ -339,13 +382,22 @@ export async function completeTask(userId: number, taskId: number, proofUrl: str
 
 // --- ADMIN / VERIFICATION ---
 export async function getAdminStats() {
-  const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
+  let totalUsersCount = 0;
+  try {
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('is_disabled', false);
+    totalUsersCount = count || 0;
+  } catch (e) {
+    // Fallback if column doesn't exist yet
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    totalUsersCount = count || 0;
+  }
+  
   const { count: activeTeams } = await supabase.from('teams').select('*', { count: 'exact', head: true });
   const { count: pendingTasks } = await supabase.from('user_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending');
   const { count: monthlyAttendance } = await supabase.from('attendances').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
   
   return {
-    totalUsers: totalUsers || 0,
+    totalUsers: totalUsersCount,
     activeTeams: activeTeams || 0,
     pendingTasks: pendingTasks || 0,
     monthlyAttendance: monthlyAttendance || 0

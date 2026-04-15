@@ -49,7 +49,8 @@ export default function PresenceConfirmation() {
       try {
         const usersData = await getUsers();
         console.log("PresenceConfirmation: Users fetched:", usersData?.length);
-        setUsers(Array.isArray(usersData) ? usersData : []);
+        const activeUsers = (Array.isArray(usersData) ? usersData : []).filter(u => !u.is_disabled);
+        setUsers(activeUsers);
       } catch (userErr) {
         console.error("PresenceConfirmation: Error fetching users:", userErr);
       }

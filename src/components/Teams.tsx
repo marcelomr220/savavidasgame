@@ -39,7 +39,7 @@ export default function Teams({ user, onUpdateUser }: { user: User, onUpdateUser
     setLoadingMembers(true);
     try {
       const data = await getTeamMembers(team.id);
-      setTeamMembers(data);
+      setTeamMembers(data.filter(u => !u.is_disabled));
     } catch (error) {
       console.error("Error fetching team members:", error);
     } finally {
