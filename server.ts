@@ -394,14 +394,9 @@ async function startServer(app: any) {
   // Auth (Using custom 'users' table, bcrypt and JWT)
   app.post("/api/login", async (req, res) => {
     try {
-      const { email, password, action } = req.body;
+      const { email, password } = req.body;
       
-      console.log('--- MANUAL LOGIN ATTEMPT ---');
-      console.log('Email:', email);
-
-      if (action && action !== 'login') {
-        return res.status(400).json({ success: false, error: "Invalid action for this endpoint" });
-      }
+      console.log('LOGIN EMAIL:', email);
 
       if (!email || !password) {
         return res.status(400).json({ success: false, error: "Email e senha são obrigatórios" });
@@ -429,29 +424,35 @@ async function startServer(app: any) {
         const sqliteUser = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id WHERE u.email = ?").get(email);
         if (sqliteUser) {
           user = sqliteUser;
-          // Format for consistency
           user.team_name = sqliteUser.team_name;
         }
       }
 
-      // 3. Validate user and password
+      // 3. Validate user
       if (!user) {
         return res.status(404).json({ success: false, error: "Usuário não encontrado" });
       }
 
-      // Handle plain text vs hash (auto-conversion)
-      const isHashed = user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$'));
-      const isMatch = isHashed 
-        ? await bcrypt.compare(password, user.password)
-        : user.password === password;
+      console.log('TIPO SENHA:', (user.password && user.password.startsWith('$2a$')) ? 'HASH' : 'PLAIN');
 
-      if (!isMatch) {
+      // 4. Validate password (Handle both bcrypt hash and plain text)
+      const isHashed = user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$'));
+      let senhaValida = false;
+
+      if (isHashed) {
+        senhaValida = await bcrypt.compare(password, user.password);
+      } else {
+        // Plain text comparison
+        senhaValida = password === user.password;
+      }
+
+      if (!senhaValida) {
          return res.status(401).json({ success: false, error: "Senha inválida" });
       }
 
-      // 4. Security: Auto-hash if current password is plain text
+      // 5. Auto-hash if current password is plain text
       if (!isHashed) {
-        console.log(`Auto-hashing password for user ${email}`);
+        console.log(`MIGRANDO SENHA PARA BCRYPT: ${email}`);
         const hashedPassword = await bcrypt.hash(password, 10);
         
         if (supabase) {
@@ -462,7 +463,7 @@ async function startServer(app: any) {
         }
       }
 
-      // 5. Update last activity
+      // 6. Update last activity
       const now = new Date().toISOString();
       if (supabase) {
         await supabase.from('users').update({ last_activity_at: now }).eq('id', user.id);
@@ -471,18 +472,28 @@ async function startServer(app: any) {
         db.prepare("UPDATE users SET last_activity_at = ? WHERE id = ?").run(now, user.id);
       }
       
-      // 6. Generate Session Token (JWT)
+      // 7. Generate Session Token (JWT)
       const token = jwt.sign(
         { userId: user.id, email: user.email, role: user.role },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
 
-      // 7. Success response (never return password)
+      // 8. Success response (never return password)
       const { password: _, ...userWithoutPassword } = user;
       return res.status(200).json({
         success: true,
-        user: { ...userWithoutPassword, team_name: user.teams?.name || user.team_name || null },
+        user: { 
+          id: user.id, 
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          team_name: user.teams?.name || user.team_name || null,
+          points: user.points,
+          level: user.level,
+          streak: user.streak,
+          is_disabled: user.is_disabled
+        },
         token
       });
 

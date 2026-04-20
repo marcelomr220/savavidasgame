@@ -11,7 +11,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "migrate:supabase": "node migrate_to_supabase.js",
-    "restore:supabase": "node restore_from_supabase.js"
+    "restore:supabase": "node restore_from_supabase.js",
+    "migrate:passwords": "tsx migrate_passwords.ts"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.6",
