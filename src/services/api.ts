@@ -3,90 +3,45 @@ import { User, Team, Task, UserTask, BiblicalQuestion, UserTree, InvestigationCa
 
 // --- AUTH ---
 export async function login(email: string, password: string): Promise<User> {
-  console.log('FRONTEND LOGIN ATTEMPT:', email);
-  
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email,
-    password
+  const response = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'login', email, password })
   });
 
-  if (authError) {
-    console.error('FRONTEND LOGIN ERROR:', authError);
-    if (authError.message.includes('Invalid login credentials')) {
-      throw new Error('Credenciais inválidas');
-    }
-    throw new Error(authError.message);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Credenciais inválidas');
   }
 
-  // Auth successful, fetch profile from public.users table
-  const { data: userProfile, error: profileError } = await supabase
-    .from('users')
-    .select('*, teams!team_id(name)')
-    .eq('email', email)
-    .single();
-
-  if (profileError) {
-    console.warn('PROFILE NOT FOUND AFTER AUTH SUCCESS:', profileError);
-    // If profile is missing, return a basic user object from auth data
-    return {
-      id: authData.user.id as any,
-      email: authData.user.email!,
-      name: authData.user.user_metadata?.name || email.split('@')[0],
-      role: 'user',
-      points: 0,
-      level: 1,
-      streak: 0
-    } as User;
+  const data = await response.json();
+  
+  if (data.token) {
+    localStorage.setItem('token', data.token);
   }
-
-  return {
-    ...userProfile,
-    team_name: userProfile.teams?.name || null
-  } as User;
+  
+  return data.user;
 }
 
 export async function register(name: string, email: string, password: string): Promise<User> {
-  console.log('FRONTEND REGISTER ATTEMPT:', email);
-
-  // 1. Create user in Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { name }
-    }
+  const response = await fetch('/api/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'register', name, email, password })
   });
 
-  if (authError) {
-    console.error('FRONTEND REGISTER ERROR:', authError);
-    throw new Error(authError.message);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Erro ao registrar');
   }
 
-  // 2. Create profile in public.users
-  const { data: newUser, error: profileError } = await supabase
-    .from('users')
-    .insert([{
-      name,
-      email,
-      role: 'user',
-      points: 0,
-      level: 1,
-      streak: 0
-    }])
-    .select()
-    .single();
-
-  if (profileError) {
-    console.error('FRONTEND PROFILE CREATION ERROR:', profileError);
-    // If it's a conflict, maybe the user exists in profile but not auth?
-    // In many cases, we might want to return the auth user anyway if this fails
-    if (profileError.code === '23505') {
-       throw new Error('Este email já está cadastrado no sistema.');
-    }
-    throw new Error('Erro ao criar perfil de usuário.');
+  const data = await response.json();
+  
+  if (data.token) {
+    localStorage.setItem('token', data.token);
   }
-
-  return newUser as User;
+  
+  return data.user;
 }
 
 // --- USERS ---

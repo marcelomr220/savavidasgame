@@ -7,10 +7,13 @@ import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import multer from "multer";
 import crypto from "crypto";
 
 dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev-only';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -383,17 +386,17 @@ async function startServer(app: any) {
     res.json({
       configured: !!supabase,
       url: supabaseUrl || null,
-      hasKey: !!supabaseKey,
+      hasKey: !!supabaseAnonKey,
       test: testResult
     });
   });
 
-  // Auth (Using Supabase Auth)
+  // Auth (Using custom 'users' table, bcrypt and JWT)
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password, action } = req.body;
       
-      console.log('--- LOGIN ATTEMPT ---');
+      console.log('--- MANUAL LOGIN ATTEMPT ---');
       console.log('Email:', email);
 
       if (action && action !== 'login') {
@@ -404,107 +407,85 @@ async function startServer(app: any) {
         return res.status(400).json({ success: false, error: "Email e senha são obrigatórios" });
       }
       
+      let user: any = null;
+
+      // 1. Try to find user in Supabase 'users' table
       if (supabase) {
-        // 1. Authenticate with Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        console.log('LOGIN DATA:', authData);
-
-        if (authError) {
-          console.log('LOGIN ERROR:', authError);
-          // 401 for invalid credentials
-          if (authError.status === 400 || authError.status === 401 || authError.message.includes('Invalid login credentials')) {
-            // Check SQLite fallback before giving up
-            if (db) {
-              const sqliteUser = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id WHERE u.email = ?").get(email);
-              if (sqliteUser) {
-                const isMatch = sqliteUser.password && (sqliteUser.password.startsWith('$2a$') || sqliteUser.password.startsWith('$2b$')) 
-                  ? await bcrypt.compare(password, sqliteUser.password)
-                  : sqliteUser.password === password;
-
-                if (isMatch) {
-                  console.log('Login successful via SQLite fallback');
-                  const now = new Date().toISOString();
-                  db.prepare("UPDATE users SET last_activity_at = ? WHERE id = ?").run(now, sqliteUser.id);
-                  const { password: _, ...userWithoutPassword } = sqliteUser;
-                  return res.json({
-                    success: true,
-                    user: { ...userWithoutPassword, team_name: sqliteUser.team_name || null }
-                  });
-                }
-              }
-            }
-            return res.status(401).json({ success: false, error: "Credenciais inválidas" });
-          }
-          
-          if (authError.message.includes('Email not confirmed')) {
-            return res.status(401).json({ success: false, error: "E-mail não confirmado. Verifique sua caixa de entrada." });
-          }
-          
-          return res.status(401).json({ success: false, error: authError.message });
-        }
-
-        // 2. Fetch User Profile from 'public.users'
-        const { data: user, error: profileError } = await supabase
+        const { data, error } = await supabase
           .from('users')
           .select('*, teams!team_id(name)')
           .eq('email', email)
-          .single();
+          .maybeSingle();
 
-        if (profileError) {
-          console.log('PROFILE FETCH ERROR:', profileError);
-          // If no profile exists yet, return basic auth user info
-          return res.json({
-            success: true,
-            user: {
-              id: authData.user?.id,
-              email: authData.user?.email,
-              name: authData.user?.user_metadata?.name || email.split('@')[0],
-              role: 'user',
-              points: 0,
-              level: 1,
-              streak: 0
-            }
-          });
+        if (error) {
+          console.error('DATABASE ERROR:', error);
+        } else if (data) {
+          user = data;
         }
+      }
 
-        // 3. Update last activity
-        const now = new Date().toISOString();
+      // 2. Fallback to SQLite if not found in Supabase
+      if (!user && db) {
+        const sqliteUser = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id WHERE u.email = ?").get(email);
+        if (sqliteUser) {
+          user = sqliteUser;
+          // Format for consistency
+          user.team_name = sqliteUser.team_name;
+        }
+      }
+
+      // 3. Validate user and password
+      if (!user) {
+        return res.status(404).json({ success: false, error: "Usuário não encontrado" });
+      }
+
+      // Handle plain text vs hash (auto-conversion)
+      const isHashed = user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$'));
+      const isMatch = isHashed 
+        ? await bcrypt.compare(password, user.password)
+        : user.password === password;
+
+      if (!isMatch) {
+         return res.status(401).json({ success: false, error: "Senha inválida" });
+      }
+
+      // 4. Security: Auto-hash if current password is plain text
+      if (!isHashed) {
+        console.log(`Auto-hashing password for user ${email}`);
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        if (supabase) {
+          await supabase.from('users').update({ password: hashedPassword }).eq('id', user.id);
+        }
+        if (db) {
+          db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashedPassword, user.id);
+        }
+      }
+
+      // 5. Update last activity
+      const now = new Date().toISOString();
+      if (supabase) {
         await supabase.from('users').update({ last_activity_at: now }).eq('id', user.id);
-        
-        const { password: _, ...userWithoutPassword } = user;
-        return res.json({
-          success: true,
-          user: { ...userWithoutPassword, team_name: user.teams?.name || null }
-        });
       }
-
-      // Fallback to pure SQLite if Supabase is not configured
       if (db) {
-        const user = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id WHERE u.email = ?").get(email);
-        
-        if (user) {
-          const isMatch = user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) 
-            ? await bcrypt.compare(password, user.password)
-            : user.password === password;
-
-          if (isMatch) {
-            const now = new Date().toISOString();
-            db.prepare("UPDATE users SET last_activity_at = ? WHERE id = ?").run(now, user.id);
-            
-            const { password: _, ...userWithoutPassword } = user;
-            return res.json({
-              success: true,
-              user: { ...userWithoutPassword, team_name: user.team_name || null }
-            });
-          }
-        }
+        db.prepare("UPDATE users SET last_activity_at = ? WHERE id = ?").run(now, user.id);
       }
+      
+      // 6. Generate Session Token (JWT)
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
-      res.status(401).json({ success: false, error: "Credenciais inválidas" });
+      // 7. Success response (never return password)
+      const { password: _, ...userWithoutPassword } = user;
+      return res.status(200).json({
+        success: true,
+        user: { ...userWithoutPassword, team_name: user.teams?.name || user.team_name || null },
+        token
+      });
+
     } catch (err: any) {
       console.error("FATAL LOGIN ERROR:", err);
       res.status(500).json({ success: false, error: "Erro interno no servidor" });
@@ -525,19 +506,21 @@ async function startServer(app: any) {
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
       
+      let newUser: any = null;
+
+      // 1. Check if user exists in Supabase
       if (supabase) {
-        // Check if user exists
         const { data: existingUser } = await supabase
           .from('users')
           .select('id')
           .eq('email', email)
-          .single();
+          .maybeSingle();
         
         if (existingUser) {
-          return res.status(400).json({ error: "Este email já está cadastrado" });
+          return res.status(400).json({ success: false, error: "Este email já está cadastrado" });
         }
 
-        const { data: newUser, error } = await supabase
+        const { data, error } = await supabase
           .from('users')
           .insert([{ 
             name, 
@@ -552,38 +535,40 @@ async function startServer(app: any) {
           .single();
         
         if (error) throw error;
-
-        // Sync to SQLite
-        if (db) {
-          db.prepare("INSERT OR REPLACE INTO users (id, name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
-            newUser.id, name, email, hashedPassword, 'user', 0, 1, 0
-          );
-        }
-
-        return res.json({ success: true, user: newUser });
+        newUser = data;
       }
 
-      // SQLite only fallback
+      // 2. Fallback or Sync to SQLite
       if (db) {
-        const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-        if (existingUser) {
-          return res.status(400).json({ success: false, error: "Este email já está cadastrado" });
+        if (!supabase) {
+          const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+          if (existingUser) {
+            return res.status(400).json({ success: false, error: "Este email já está cadastrado" });
+          }
         }
 
-        const result = db.prepare("INSERT INTO users (name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-          name, email, hashedPassword, 'user', 0, 1, 0
+        const result = db.prepare("INSERT OR REPLACE INTO users (id, name, email, password, role, points, level, streak) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+          newUser?.id || null, name, email, hashedPassword, 'user', 0, 1, 0
         );
-        const lastId = result.lastInsertRowid;
         
-        if (supabase) {
-          await supabase.from('users').insert([{ id: lastId, name, email, password: hashedPassword, role: 'user', points: 0, level: 1, streak: 0 }]);
+        if (!newUser) {
+          newUser = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
         }
-        
-        const newUser = db.prepare("SELECT * FROM users WHERE id = ?").get(lastId);
-        return res.json({ success: true, user: newUser });
       }
-      
-      return res.status(500).json({ success: false, error: "Serviço de banco de dados indisponível" });
+
+      if (!newUser) {
+        return res.status(500).json({ success: false, error: "Erro ao criar usuário" });
+      }
+
+      // 3. Generate token for auto-login after register
+      const token = jwt.sign(
+        { userId: newUser.id, email: newUser.email, role: newUser.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      const { password: _, ...userWithoutPassword } = newUser;
+      return res.status(200).json({ success: true, user: userWithoutPassword, token });
     } catch (err: any) {
       console.error("Registration error:", err);
       res.status(500).json({ success: false, error: err.message || "Erro ao realizar cadastro" });

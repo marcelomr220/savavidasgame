@@ -12,6 +12,7 @@ export interface User {
   birth_date?: string;
   last_activity_at?: string;
   is_disabled?: boolean;
+  created_at?: string;
 }
 
 export interface BirthdayMessage {
