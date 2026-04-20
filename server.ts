@@ -25,19 +25,30 @@ try {
 }
 
 // Supabase Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
-const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY)?.trim();
+const supabaseUrl = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL)?.trim();
+const supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY)?.trim();
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 let supabase: any = null;
-if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
+if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
   try {
-    supabase = createClient(supabaseUrl, supabaseKey);
-    console.log("Supabase client initialized.");
+    // We use the ANON key for the main client to handle user auth as requested
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    console.log("Supabase client initialized with ANON key.");
   } catch (e) {
     console.error("Failed to initialize Supabase client:", e);
   }
 } else {
-  console.warn("Supabase URL or Key is missing or invalid. Check your environment variables.");
+  console.warn("Supabase URL or Anon Key is missing or invalid. Check your environment variables.");
+}
+
+// Admin client for bypass operations if needed
+let supabaseAdmin: any = supabase;
+if (supabaseUrl && supabaseServiceKey) {
+  try {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    console.log("Supabase admin client initialized with SERVICE_ROLE key.");
+  } catch (e) {}
 }
 
 // Helper function to calculate age
@@ -377,12 +388,14 @@ async function startServer(app: any) {
     });
   });
 
-  // Auth (Simplified with Hashing)
+  // Auth (Using Supabase Auth)
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password, action } = req.body;
       
-      // If action is provided, it should be 'login'
+      console.log('--- LOGIN ATTEMPT ---');
+      console.log('Email:', email);
+
       if (action && action !== 'login') {
         return res.status(400).json({ success: false, error: "Invalid action for this endpoint" });
       }
@@ -392,31 +405,84 @@ async function startServer(app: any) {
       }
       
       if (supabase) {
-        const { data: user, error } = await supabase
+        // 1. Authenticate with Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        console.log('LOGIN DATA:', authData);
+
+        if (authError) {
+          console.log('LOGIN ERROR:', authError);
+          // 401 for invalid credentials
+          if (authError.status === 400 || authError.status === 401 || authError.message.includes('Invalid login credentials')) {
+            // Check SQLite fallback before giving up
+            if (db) {
+              const sqliteUser = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id WHERE u.email = ?").get(email);
+              if (sqliteUser) {
+                const isMatch = sqliteUser.password && (sqliteUser.password.startsWith('$2a$') || sqliteUser.password.startsWith('$2b$')) 
+                  ? await bcrypt.compare(password, sqliteUser.password)
+                  : sqliteUser.password === password;
+
+                if (isMatch) {
+                  console.log('Login successful via SQLite fallback');
+                  const now = new Date().toISOString();
+                  db.prepare("UPDATE users SET last_activity_at = ? WHERE id = ?").run(now, sqliteUser.id);
+                  const { password: _, ...userWithoutPassword } = sqliteUser;
+                  return res.json({
+                    success: true,
+                    user: { ...userWithoutPassword, team_name: sqliteUser.team_name || null }
+                  });
+                }
+              }
+            }
+            return res.status(401).json({ success: false, error: "Credenciais inválidas" });
+          }
+          
+          if (authError.message.includes('Email not confirmed')) {
+            return res.status(401).json({ success: false, error: "E-mail não confirmado. Verifique sua caixa de entrada." });
+          }
+          
+          return res.status(401).json({ success: false, error: authError.message });
+        }
+
+        // 2. Fetch User Profile from 'public.users'
+        const { data: user, error: profileError } = await supabase
           .from('users')
           .select('*, teams!team_id(name)')
           .eq('email', email)
           .single();
 
-        if (user) {
-          const isMatch = user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) 
-            ? await bcrypt.compare(password, user.password)
-            : user.password === password;
-
-          if (isMatch) {
-            const now = new Date().toISOString();
-            await supabase.from('users').update({ last_activity_at: now }).eq('id', user.id);
-            
-            const { password: _, ...userWithoutPassword } = user;
-            return res.json({
-              success: true,
-              user: { ...userWithoutPassword, team_name: user.teams?.name || null }
-            });
-          }
+        if (profileError) {
+          console.log('PROFILE FETCH ERROR:', profileError);
+          // If no profile exists yet, return basic auth user info
+          return res.json({
+            success: true,
+            user: {
+              id: authData.user?.id,
+              email: authData.user?.email,
+              name: authData.user?.user_metadata?.name || email.split('@')[0],
+              role: 'user',
+              points: 0,
+              level: 1,
+              streak: 0
+            }
+          });
         }
+
+        // 3. Update last activity
+        const now = new Date().toISOString();
+        await supabase.from('users').update({ last_activity_at: now }).eq('id', user.id);
+        
+        const { password: _, ...userWithoutPassword } = user;
+        return res.json({
+          success: true,
+          user: { ...userWithoutPassword, team_name: user.teams?.name || null }
+        });
       }
 
-      // Fallback to SQLite
+      // Fallback to pure SQLite if Supabase is not configured
       if (db) {
         const user = db.prepare("SELECT u.*, t.name as team_name FROM users u LEFT JOIN teams t ON u.team_id = t.id WHERE u.email = ?").get(email);
         
@@ -429,11 +495,6 @@ async function startServer(app: any) {
             const now = new Date().toISOString();
             db.prepare("UPDATE users SET last_activity_at = ? WHERE id = ?").run(now, user.id);
             
-            if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
-              const hashedPassword = await bcrypt.hash(password, 10);
-              db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashedPassword, user.id);
-            }
-            
             const { password: _, ...userWithoutPassword } = user;
             return res.json({
               success: true,
@@ -445,7 +506,7 @@ async function startServer(app: any) {
 
       res.status(401).json({ success: false, error: "Credenciais inválidas" });
     } catch (err: any) {
-      console.error("Login error:", err);
+      console.error("FATAL LOGIN ERROR:", err);
       res.status(500).json({ success: false, error: "Erro interno no servidor" });
     }
   });
